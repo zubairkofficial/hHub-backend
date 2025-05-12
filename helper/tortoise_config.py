@@ -7,12 +7,16 @@ DATABASE_URL = os.environ['DATABASE_URL']
 
 TORTOISE_CONFIG = {
     'connections': {
-        'default': DATABASE_URL
+        'default': "mysql://admin:password@localhost:3306/h_hub"
     },
     'apps': {
-        'models': [
-        ],
+        'models': {
+            'models': [
+                'aerich.models',
+                'models.model'
+                ] ,
         'default_connection': 'default'
+        },
     },
 }
 
@@ -21,3 +25,5 @@ async def lifespan(_):
     await Tortoise.init(config=TORTOISE_CONFIG)
     print("Initializing LifeSpan")
     yield
+
+    
