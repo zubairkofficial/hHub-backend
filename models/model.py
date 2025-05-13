@@ -1,4 +1,5 @@
 from tortoise import Tortoise, fields, Model
+from datetime import datetime
 
 
 class Lead_Ranks(Model):
@@ -7,5 +8,7 @@ class Lead_Ranks(Model):
     description = fields.TextField()
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
+
+
 
 
