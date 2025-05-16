@@ -121,27 +121,6 @@ class Database:
         }
         return await self.insert('export_xml', data)
 
-    async def get_all_tables(self) -> List[str]:
-        """
-        Get a list of all tables in the database
-        """
-        query = "SHOW TABLES"
-        results = await self.fetch(query)
-        return [list(table.values())[0] for table in results]
-
-    async def get_table_structure(self, table_name: str) -> List[Dict[str, Any]]:
-        """
-        Get the structure (columns and their types) of a specific table
-        """
-        query = f"DESCRIBE {table_name}"
-        return await self.fetch(query)
-
-    async def get_table_data(self, table_name: str, limit: int = 100) -> List[Dict[str, Any]]:
-        """
-        Get data from a specific table with a limit
-        """
-        query = f"SELECT * FROM {table_name} LIMIT {limit}"
-        return await self.fetch(query)
 
     async def create_lead_score_table(self):
         """
@@ -172,8 +151,6 @@ class Database:
             intent_score FLOAT,
             urgency_score FLOAT,
             overall_score FLOAT,
-            priority VARCHAR(50),
-            priority_level INT
         )
         """
         await self.execute(create_table_query)
@@ -183,17 +160,20 @@ class Database:
         Sync all data from callrails to lead_score table (using ORM, including call_recording links).
         Returns the count of new rows inserted.
         """
-        callrail_data = await self.fetch("SELECT * FROM callrails")
+        callrail_data = await self.fetch("SELECT * FROM callrails LIMIT 6")
+        print(f"Call rail data  == {callrail_data}")
         inserted_count = 0
         for record in callrail_data:
-            callrail_id = record.get('callrail_id')
-            if not callrail_id:
+            callrail_record_id = record.get('id')  # Use the unique PK from callrails
+            callrail_id = record.get('callrail_id')  # Use the string ID from callrails
+            if not callrail_record_id or not callrail_id:
                 continue
-            exists = await LeadScore.filter(call_id=callrail_id).first()
+            exists = await LeadScore.filter(callrail_record_id=callrail_record_id).first()
             if exists:
                 continue
             await LeadScore.create(
-                call_id=callrail_id,
+                callrail_record_id=callrail_record_id,
+                callrail_id=callrail_id,
                 call_recording=record.get('call_recording'),
                 name=record.get('name'),
                 date=record.get('date'),
@@ -215,9 +195,7 @@ class Database:
                 tone_score=None,
                 intent_score=None,
                 urgency_score=None,
-                overall_score=None,
-                priority=None,
-                priority_level=None
+                overall_score=None
             )
             inserted_count += 1
         return inserted_count

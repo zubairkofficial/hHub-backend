@@ -8,7 +8,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Include the routers
 app.include_router(lead_router, prefix="/api/v1", tags=["lead-scoring"])
-app.include_router(call_router, prefix="/api/v1", tags=["call-processing"])
+app.include_router(call_router, prefix="/api/v1", tags=["call-analysis"])
 
 @app.get('/')
 def default_api():

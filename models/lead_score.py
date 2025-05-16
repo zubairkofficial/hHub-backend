@@ -2,10 +2,11 @@ from tortoise import fields, models
 
 class LeadScore(models.Model):
     id = fields.IntField(pk=True)
-    call_id = fields.CharField(max_length=255)
+    callrail_id = fields.CharField(max_length=255)
     call_recording = fields.TextField(null=True)
     name = fields.CharField(max_length=255, null=True)
     date = fields.DatetimeField(null=True)
+    callrail_record_id = fields.IntField(null = True)
     source_type = fields.CharField(max_length=255, null=True)
     phone_number = fields.CharField(max_length=50, null=True)
     duration = fields.IntField(null=True)
@@ -25,8 +26,8 @@ class LeadScore(models.Model):
     intent_score = fields.FloatField(null=True)
     urgency_score = fields.FloatField(null=True)
     overall_score = fields.FloatField(null=True)
-    priority = fields.CharField(max_length=50, null=True)
-    priority_level = fields.IntField(null=True)
 
     class Meta:
         table = "lead_score" 
+        ordering = ["-overall_score"]
+        
