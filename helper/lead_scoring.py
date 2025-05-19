@@ -18,7 +18,7 @@ class LeadAnalysis(BaseModel):
 class LeadScoringService:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-4",
+            model="gpt-4o-mini",
             temperature=0,
             api_key=os.getenv("OPENAI_API_KEY")
         )

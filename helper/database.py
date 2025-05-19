@@ -1,12 +1,15 @@
 import aiomysql
 from typing import List, Dict, Tuple, Any
 from helper.call_processor import CallProcessor
+from helper.lead_scoring import LeadScoringService
 from models.lead_score import LeadScore
 from urllib.parse import urlparse, parse_qs
 import re
 from fastapi import HTTPException
 import os
 from dotenv import load_dotenv
+import asyncio
+from datetime import datetime
 
 load_dotenv()
 
@@ -17,6 +20,8 @@ class Database:
         self.user = os.getenv('DB_USER')
         self.password = os.getenv('DB_PASSWORD')
         self.db = os.getenv('DB_NAME')
+        self.processor = CallProcessor()
+        self.scoring_service = LeadScoringService()
 
     async def connect(self):
         return await aiomysql.connect(host=self.host, port=self.port, user=self.user, password=self.password, db=self.db, cursorclass=aiomysql.DictCursor)
@@ -120,129 +125,269 @@ class Database:
         }
         return await self.insert('export_xml', data)
 
-
-    async def create_lead_score_table(self):
-        """
-        Create the lead_score table with all required fields
-        """
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS lead_score (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            call_id VARCHAR(255) NOT NULL,
-            name VARCHAR(255),
-            date DATETIME,
-            source_type VARCHAR(255),
-            phone_number VARCHAR(50),
-            duration INT,
-            country VARCHAR(10),
-            state VARCHAR(10),
-            city VARCHAR(100),
-            answer TINYINT,
-            first_call TINYINT,
-            lead_status TINYINT,
-            call_highlight TINYINT,
-            transcription TEXT,
-            note TEXT,
-            created_at DATETIME,
-            updated_at DATETIME,
-            deleted_at DATETIME,
-            tone_score FLOAT,
-            intent_score FLOAT,
-            urgency_score FLOAT,
-            overall_score FLOAT,
-        )
-        """
-        await self.execute(create_table_query)
-
-    async def sync_callrail_to_lead_score(self):
-        """
-        Sync all data from callrails to lead_score table (using ORM, including call_recording links).
-        Returns the count of new rows inserted.
-        """
-        callrail_data = await self.fetch("SELECT * FROM callrails LIMIT 7")
-        print(f"Call rail data  == {callrail_data}")
-        inserted_count = 0
-        for record in callrail_data:
-            callrail_record_id = record.get('id')  # Use the unique PK from callrails
-            callrail_id = record.get('callrail_id')  # Use the string ID from callrails
-            if not callrail_record_id or not callrail_id:
-                continue
-            exists = await LeadScore.filter(callrail_record_id=callrail_record_id).first()
-            if exists:
-                continue
-            await LeadScore.create(
-                callrail_record_id=callrail_record_id,
-                callrail_id=callrail_id,
-                call_recording=record.get('call_recording'),
-                name=record.get('name'),
-                date=record.get('date'),
-                source_type=record.get('source_type'),
-                phone_number=record.get('phone_number'),
-                duration=record.get('duration'),
-                country=record.get('country'),
-                state=record.get('state'),
-                city=record.get('city'),
-                answer=record.get('answer'),
-                first_call=record.get('first_call'),
-                lead_status=record.get('lead_status'),
-                call_highlight=record.get('call_highlight'),
-                transcription=None,
-                note=record.get('note'),
-                created_at=record.get('created_at'),
-                updated_at=record.get('updated_at'),
-                deleted_at=record.get('deleted_at'),
-                tone_score=None,
-                intent_score=None,
-                urgency_score=None,
-                overall_score=None
-            )
-            inserted_count += 1
-        return inserted_count
-
     def extract_call_id_from_url(self, url: str):
         match = re.search(r'/calls/([A-Za-z0-9]+)/', url)
         if match:
             return match.group(1)
         return None
 
-    async def batch_transcribe_lead_score(self):
-        """
-        For each row in lead_score with no transcription, use the process_calling logic:
-        - Use the call_id and fixed account_id to get the real recording URL from the CallRail API (with Bearer token from .env)
-        - Download and transcribe the audio
-        - Save the transcription in lead_score.transcription
-        Returns the count of new transcriptions made.
-        """
-        processor = CallProcessor()
-        FIXED_ACCOUNT_ID = "562206937"
-        rows = await LeadScore.filter(transcription__isnull=True).all()
-        transcribed_count = 0
-        for row in rows:
-            recording_url = row.call_recording
-            if not recording_url:
-                print(f"[batch_transcribe] Skipping row {row.id}: no call_recording URL")
-                continue
-            call_id = self.extract_call_id_from_url(recording_url)
+    async def process_single_call(self, call_data: Dict[str, Any], client_id: str) -> Dict[str, Any]:
+        """Process a single call with transcription and analysis"""
+        try:
+            call_recording = call_data.get('call_recording')
+            if not call_recording:
+                return None
+
+            call_id = self.extract_call_id_from_url(call_recording)
             if not call_id:
-                print(f"[batch_transcribe] Skipping row {row.id}: could not extract call_id from URL")
-                continue
-            print(f"[batch_transcribe] Processing row {row.id} with call_id: {call_id}")
-            try:
-                result = await processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
-                if result.get('status') == 'error' or 'error' in result:
-                    print(f"[batch_transcribe] Failed to process call for row {row.id}: {result.get('error')}")
-                    continue
-                await LeadScore.filter(id=row.id).update(transcription=result['transcription'])
-                print(f"[batch_transcribe] Transcription saved for row {row.id}")
-                transcribed_count += 1
-            except HTTPException as e:
-                if getattr(e, 'status_code', None) == 404:
-                    print(f"[batch_transcribe] Row {row.id}: Lead score not found (404), skipping.")
-                    continue
-                else:
-                    print(f"[batch_transcribe] Row {row.id}: HTTPException: {e.detail}")
-                    continue
-            except Exception as e:
-                print(f"[batch_transcribe] Row {row.id}: Unexpected error: {e}")
-                continue
-        return transcribed_count
+                return None
+
+            # Get transcription using the fixed account ID for CallRail API
+            FIXED_ACCOUNT_ID = "562206937"  # This is the CallRail account ID
+            transcription_result = await self.processor.process_call(
+                account_id=FIXED_ACCOUNT_ID,  # Use the fixed account ID instead of client_id
+                call_id=call_id
+            )
+            
+            if not transcription_result or 'transcription' not in transcription_result:
+                return None
+
+            transcription = transcription_result['transcription']
+            
+            # Get analysis and scoring using the instance variable
+            analysis = await self.scoring_service.analyze_transcription(transcription)
+
+            return {
+                'client_id': client_id,  # Keep the original client_id for database storage
+                'callrail_id': call_data.get('callrail_id'),
+                'call_recording': call_recording,
+                'name': call_data.get('name'),
+                'date': call_data.get('date'),
+                'source_type': call_data.get('source_type'),
+                'phone_number': call_data.get('phone_number'),
+                'duration': call_data.get('duration'),
+                'country': call_data.get('country'),
+                'state': call_data.get('state'),
+                'city': call_data.get('city'),
+                'answer': call_data.get('answer'),
+                'first_call': call_data.get('first_call'),
+                'lead_status': call_data.get('lead_status'),
+                'call_highlight': call_data.get('call_highlight'),
+                'analysis_summary': analysis.analysis_summary,
+                'tone_score': analysis.tone_score,
+                'intent_score': analysis.intent_score,
+                'urgency_score': analysis.urgency_score,
+                'overall_score': analysis.overall_score,
+                'created_at': datetime.now(),
+                'updated_at': datetime.now()
+            }
+        except Exception as e:
+            print(f"Error processing call: {str(e)}")
+            return None
+
+    async def process_client_calls(self, client_id: str) -> Dict[str, Any]:
+        """
+        Process all calls for a client:
+        1. Get all call recordings from callrails for this client
+        2. Process each recording to get transcription and analysis
+        3. Calculate aggregate scores
+        4. Update or create lead_score record
+        """
+        try:
+            # Fetch all calls for the client from callrails
+            callrail_data = await self.fetch(
+                "SELECT * FROM callrails WHERE client_id = %s",
+                (client_id,)
+            )
+            
+            if not callrail_data:
+                return {"status": "success", "message": "No calls found for this client"}
+
+            # Process calls in parallel using asyncio
+            tasks = []
+            for call in callrail_data:
+                task = asyncio.create_task(self.process_single_call(call, client_id))
+                tasks.append(task)
+            
+            results = await asyncio.gather(*tasks)
+            results = [r for r in results if r is not None]  # Filter out None results
+            
+            if not results:
+                return {"status": "error", "message": "No calls were successfully processed"}
+
+            # Calculate aggregate scores
+            total_calls = len(results)
+            aggregate_tone = sum(r['tone_score'] for r in results) / total_calls
+            aggregate_intent = sum(r['intent_score'] for r in results) / total_calls
+            aggregate_urgency = sum(r['urgency_score'] for r in results) / total_calls
+            aggregate_overall = sum(r['overall_score'] for r in results) / total_calls
+            
+            # Combine all analysis summaries
+            combined_summary = "\n\n".join([r['analysis_summary'] for r in results])
+            
+            # Check if a record already exists for this client
+            existing_record = await LeadScore.filter(client_id=client_id).first()
+            
+            if existing_record:
+                # Update existing record
+                await LeadScore.filter(id=existing_record.id).update(
+                    analysis_summary=combined_summary,
+                    tone_score=aggregate_tone,
+                    intent_score=aggregate_intent,
+                    urgency_score=aggregate_urgency,
+                    overall_score=aggregate_overall,
+                    updated_at=datetime.now()
+                )
+            else:
+                # Create new record
+                await LeadScore.create(
+                    client_id=client_id,
+                    callrail_id=callrail_data.get('callrail_id'),
+                    analysis_summary=combined_summary,
+                    tone_score=aggregate_tone,
+                    intent_score=aggregate_intent,
+                    urgency_score=aggregate_urgency,
+                    overall_score=aggregate_overall,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+            
+            return {
+                "status": "success",
+                "message": f"Successfully processed {len(results)} calls for client {client_id}",
+                "aggregate_scores": {
+                    "tone_score": aggregate_tone,
+                    "intent_score": aggregate_intent,
+                    "urgency_score": aggregate_urgency,
+                    "overall_score": aggregate_overall
+                }
+            }
+            
+        except Exception as e:
+            print(f"Error in process_client_calls: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"An error occurred: {str(e)}"
+            }
+
+    # async def create_lead_score_table(self):
+    #     """
+    #     Create the lead_score table with all required fields including client_id
+    #     """
+    #     create_table_query = """
+    #     CREATE TABLE IF NOT EXISTS lead_score (
+    #         id INT AUTO_INCREMENT PRIMARY KEY,
+    #         client_id VARCHAR(255) NOT NULL,
+    #         callrail_id VARCHAR(255) NOT NULL,
+    #         call_recording TEXT,
+    #         name VARCHAR(255),
+    #         date DATETIME,
+    #         callrail_record_id INT,
+    #         source_type VARCHAR(255),
+    #         phone_number VARCHAR(50),
+    #         duration INT,
+    #         country VARCHAR(10),
+    #         state VARCHAR(10),
+    #         city VARCHAR(100),
+    #         answer TINYINT,
+    #         first_call TINYINT,
+    #         lead_status TINYINT,
+    #         call_highlight TINYINT,
+    #         transcription TEXT,
+    #         analysis_summary TEXT,
+    #         note TEXT,
+    #         created_at DATETIME,
+    #         updated_at DATETIME,
+    #         deleted_at DATETIME,
+    #         tone_score FLOAT,
+    #         intent_score FLOAT,
+    #         urgency_score FLOAT,
+    #         overall_score FLOAT
+    #     )
+    #     """
+    #     await self.execute(create_table_query)
+
+    # async def sync_callrail_to_lead_score(self):
+    #     """
+    #     Sync all data from callrails to lead_score table (using ORM, including call_recording links).
+    #     Returns the count of new rows inserted.
+    #     """
+    #     callrail_data = await self.fetch("SELECT * FROM callrails LIMIT 8")
+    #     print(f"Call rail data  == {callrail_data}")
+    #     inserted_count = 0
+    #     for record in callrail_data:
+    #         callrail_record_id = record.get('id')  # Use the unique PK from callrails
+    #         callrail_id = record.get('callrail_id')  # Use the string ID from callrails
+    #         if not callrail_record_id or not callrail_id:
+    #             continue
+    #         exists = await LeadScore.filter(callrail_record_id=callrail_record_id).first()
+    #         if exists:
+    #             continue
+    #         await LeadScore.create(
+    #             client_id=record.get('client_id'),
+    #             callrail_id=callrail_id,
+    #             call_recording=record.get('call_recording'),
+    #             name=record.get('name'),
+    #             date=record.get('date'),
+    #             source_type=record.get('source_type'),
+    #             phone_number=record.get('phone_number'),
+    #             duration=record.get('duration'),
+    #             country=record.get('country'),
+    #             state=record.get('state'),
+    #             city=record.get('city'),
+    #             answer=record.get('answer'),
+    #             first_call=record.get('first_call'),
+    #             lead_status=record.get('lead_status'),
+    #             call_highlight=record.get('call_highlight'),
+    #             created_at=record.get('created_at'),
+    #             updated_at=record.get('updated_at'),
+    #             deleted_at=record.get('deleted_at'),
+    #             tone_score=None,
+    #             intent_score=None,
+    #             urgency_score=None,
+    #             overall_score=None
+    #         )
+    #         inserted_count += 1
+    #     return inserted_count
+
+    # async def batch_transcribe_lead_score(self):
+    #     """
+    #     For each row in lead_score with no transcription, use the process_calling logic:
+    #     - Use the call_id and fixed account_id to get the real recording URL from the CallRail API (with Bearer token from .env)
+    #     - Download and transcribe the audio
+    #     - Save the transcription in lead_score.transcription
+    #     Returns the count of new transcriptions made.
+    #     """
+    #     processor = CallProcessor()
+    #     FIXED_ACCOUNT_ID = "562206937"
+    #     rows = await LeadScore.filter(transcription__isnull=True).all()
+    #     transcribed_count = 0
+    #     for row in rows:
+    #         recording_url = row.call_recording
+    #         if not recording_url:
+    #             print(f"[batch_transcribe] Skipping row {row.id}: no call_recording URL")
+    #             continue
+    #         call_id = self.extract_call_id_from_url(recording_url)
+    #         if not call_id:
+    #             print(f"[batch_transcribe] Skipping row {row.id}: could not extract call_id from URL")
+    #             continue
+    #         print(f"[batch_transcribe] Processing row {row.id} with call_id: {call_id}")
+    #         try:
+    #             result = await processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
+    #             if result.get('status') == 'error' or 'error' in result:
+    #                 print(f"[batch_transcribe] Failed to process call for row {row.id}: {result.get('error')}")
+    #                 continue
+    #             await LeadScore.filter(id=row.id).update(transcription=result['transcription'])
+    #             print(f"[batch_transcribe] Transcription saved for row {row.id}")
+    #             transcribed_count += 1
+    #         except HTTPException as e:
+    #             if getattr(e, 'status_code', None) == 404:
+    #                 print(f"[batch_transcribe] Row {row.id}: Lead score not found (404), skipping.")
+    #                 continue
+    #             else:
+    #                 print(f"[batch_transcribe] Row {row.id}: HTTPException: {e.detail}")
+    #                 continue
+    #         except Exception as e:
+    #             print(f"[batch_transcribe] Row {row.id}: Unexpected error: {e}")
+    #             continue
+    #     return transcribed_count
