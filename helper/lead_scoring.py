@@ -52,26 +52,3 @@ class LeadScoringService:
         analysis = self.parser.parse(response.content)
         return analysis
 
-# Example usage with dummy data
-async def test_lead_scoring():
-    service = LeadScoringService()
-    
-    # Dummy transcription for testing
-    dummy_transcription = """
-    Agent: Hello, thank you for calling our clinic. How can I help you today?
-    
-    Customer: Hi, I'm interested in getting a consultation for my knee pain. It's been bothering me for about 2 weeks now.
-    
-    Agent: I'm sorry to hear that. Could you tell me more about your symptoms?
-    
-    Customer: Yes, it's quite painful when I walk or climb stairs. I'm a regular runner, and this is really affecting my training.
-    
-    Agent: I understand. We have several experienced orthopedic specialists. Would you like to schedule an appointment?
-    
-    Customer: Yes, that would be great. I'd prefer something as soon as possible, maybe this week if possible.
-    
-    Agent: Let me check our availability for this week...
-    """
-    
-    analysis = await service.analyze_transcription(dummy_transcription)
-    return analysis 

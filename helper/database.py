@@ -5,19 +5,18 @@ from models.lead_score import LeadScore
 from urllib.parse import urlparse, parse_qs
 import re
 from fastapi import HTTPException
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
 class Database:
     def __init__(self) -> None:
-      
-        
-        self.host = "localhost"
-        self.port = 3306
-        self.user = "admin" 
-        self.password = "password" 
-        self.db = "h_hub" 
-
-       
+        self.host = os.getenv('DB_HOST')
+        self.port = int(os.getenv('DB_PORT'))
+        self.user = os.getenv('DB_USER')
+        self.password = os.getenv('DB_PASSWORD')
+        self.db = os.getenv('DB_NAME')
 
     async def connect(self):
         return await aiomysql.connect(host=self.host, port=self.port, user=self.user, password=self.password, db=self.db, cursorclass=aiomysql.DictCursor)
@@ -124,7 +123,7 @@ class Database:
 
     async def create_lead_score_table(self):
         """
-        Create the lead_score table with all required fields (allowing duplicate call_id values).
+        Create the lead_score table with all required fields
         """
         create_table_query = """
         CREATE TABLE IF NOT EXISTS lead_score (
@@ -160,7 +159,7 @@ class Database:
         Sync all data from callrails to lead_score table (using ORM, including call_recording links).
         Returns the count of new rows inserted.
         """
-        callrail_data = await self.fetch("SELECT * FROM callrails LIMIT 6")
+        callrail_data = await self.fetch("SELECT * FROM callrails LIMIT 7")
         print(f"Call rail data  == {callrail_data}")
         inserted_count = 0
         for record in callrail_data:

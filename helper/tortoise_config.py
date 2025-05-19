@@ -3,11 +3,10 @@ import os
 import dotenv
 
 dotenv.load_dotenv()
-DATABASE_URL = os.environ['DATABASE_URL']
 
 TORTOISE_CONFIG = {
     'connections': {
-        'default': "mysql://admin:password@localhost:3306/h_hub"
+        'default': os.getenv('DATABASE_URL')
     },
     'apps': {
         'models': {
