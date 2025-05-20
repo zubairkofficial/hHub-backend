@@ -214,20 +214,39 @@ async def manual_lead_score(request: ManualLeadScoreRequest):
     print("Analysis summary:", repr(analysis_summary))
     # Step 2: Score the summary
     scores = await db.scoring_service.score_summary(analysis_summary)
-    # Save to lead_score (client_id can be null)
-    await LeadScore.create(
-        client_id=request.client_id,
-        callrail_id=None,
-        analysis_summary=analysis_summary,
-        intent_score=scores.intent_score,
-        urgency_score=scores.urgency_score,
-        overall_score=scores.overall_score,
-        created_at=datetime.now(),
-        updated_at=datetime.now()
-    )
+    
+    # Check if lead score exists for this client_id
+    existing_lead_score = None
+    if request.client_id:
+        existing_lead_score = await LeadScore.filter(client_id=request.client_id).first()
+    
+    if existing_lead_score:
+        # Update existing record
+        await LeadScore.filter(id=existing_lead_score.id).update(
+            analysis_summary=analysis_summary,
+            intent_score=scores.intent_score,
+            urgency_score=scores.urgency_score,
+            overall_score=scores.overall_score,
+            updated_at=datetime.now()
+        )
+        message = f"Updated existing lead score for client {request.client_id}"
+    else:
+        # Create new record
+        await LeadScore.create(
+            client_id=request.client_id,
+            callrail_id=None,
+            analysis_summary=analysis_summary,
+            intent_score=scores.intent_score,
+            urgency_score=scores.urgency_score,
+            overall_score=scores.overall_score,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        message = f"Created new lead score for client {request.client_id}"
+    
     return {
         "status": "success",
-        "message": f"Processed {len(transcriptions)} manual calls.",
+        "message": message,
         "analysis": {
             "analysis_summary": analysis_summary,
             "intent_score": scores.intent_score,
