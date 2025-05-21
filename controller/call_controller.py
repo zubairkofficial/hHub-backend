@@ -52,7 +52,7 @@ class ManualCallRecording(BaseModel):
     callrail_id: Optional[str] = None
     state: Optional[str] = None
     city: Optional[str] = None
-    first_call: Optional[bool] = None
+    first_call: Optional[int] = 0
 
 class ManualLeadScoreRequest(BaseModel):
     client_id: Optional[str] = None  # can be null
