@@ -23,21 +23,22 @@ class LeadScoringService:
         )
         self.parser = PydanticOutputParser(pydantic_object=LeadAnalysis)
         self.summary_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert call analyst. Given the following call transcriptions and client context, write a comprehensive analysis summary.\n\nContext:\n- Client Type: {client_type}\n- Service: {service}\n- Location: {state}, {city}\n- First Call: {first_call}\n- Rota Plan: {rota_plan}\n\nCall Transcriptions:\n{transcription}\n\nWrite a single, comprehensive analysis summary that incorporates all the provided data and explains how each factor influences the lead's potential."""),
+            ("system", """You are an expert call analyst. Given the following call transcriptions, previous analysis (if any), and client context, write a comprehensive analysis summary that incorporates both historical and new information.\n\nContext:\n- Client Type: {client_type}\n- Service: {service}\n- Location: {state}, {city}\n- First Call: {first_call}\n- Rota Plan: {rota_plan}\n\nPrevious Analysis (if any):\n{previous_analysis}\n\nNew Call Transcriptions:\n{transcription}\n\nWrite a single, comprehensive analysis summary that incorporates all the provided data, including both historical context from previous analysis and new information from recent calls. Explain how each factor influences the lead's potential and highlight any changes or developments in the client's situation."""),
         ])
         self.score_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert lead scoring analyst. Given the following analysis summary, provide scores for the following aspects (0-100):\n1. Customer Intent\n2. Urgency\n3. Overall\nAlso, briefly justify each score.\n\n{format_instructions}"""),
             ("user", "Analysis Summary:\n{analysis_summary}")
         ])
 
-    async def generate_summary(self, transcription: str, client_type: Optional[str] = None, service: Optional[str] = None, state: Optional[str] = None, city: Optional[str] = None, first_call: Optional[bool] = None, rota_plan: Optional[str] = None) -> dict:
+    async def generate_summary(self, transcription: str, client_type: Optional[str] = None, service: Optional[str] = None, state: Optional[str] = None, city: Optional[str] = None, first_call: Optional[bool] = None, rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None) -> dict:
         formatted_prompt = self.summary_prompt.format_messages(
             transcription=transcription,
+            previous_analysis=previous_analysis or "No previous analysis available",
             client_type=client_type or "Not specified",
             service=service or "Not specified",
             state=state or "Not specified",
             city=city or "Not specified",
-            first_call="Yes" if first_call else "No",
+            first_call= first_call or "Not specified",
             rota_plan=rota_plan or "Not specified"
         )
         response = await self.llm.ainvoke(formatted_prompt)

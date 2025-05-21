@@ -74,6 +74,10 @@ async def analyze_client_calls(request: ClientIdRequest):
         calls = context['calls']
         if not calls:
             return {"status": "success", "message": "No calls found for this client.", "analysis": None}
+        
+        # Get existing lead score if any
+        existing_lead_score = await LeadScore.filter(client_id=client_id).first()
+        
         FIXED_ACCOUNT_ID = "562206937"
         async def transcribe_call(call):
             call_recording = call.get('call_recording')
@@ -84,16 +88,33 @@ async def analyze_client_calls(request: ClientIdRequest):
                 return None
             result = await db.processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
             return result['transcription'] if result and 'transcription' in result and result['transcription'] else None
+        
         transcriptions = await asyncio.gather(*[transcribe_call(call) for call in calls])
         transcriptions = [t for t in transcriptions if t and isinstance(t, str) and t.strip()]
         if not transcriptions:
             return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
+        
         combined_transcription = "\n\n---\n\n".join(transcriptions)
         if not combined_transcription or not isinstance(combined_transcription, str) or not combined_transcription.strip():
             return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
+
+        # Prepare data for OpenAI
+        data_for_analysis = {
+            "new_transcriptions": combined_transcription,
+            "previous_analysis": existing_lead_score.analysis_summary if existing_lead_score else None,
+            "client_type": context['client_type'],
+            "service": context['service'],
+            "state": calls[-1].get('state'),
+            "city": calls[-1].get('city'),
+            "first_call": calls[-1].get('first_call'),
+            "rota_plan": context['rota_plan']
+        }
+
         # Print data sent to OpenAI for analysis summary
         print("==== DATA SENT TO OPENAI FOR ANALYSIS SUMMARY ====")
-        print("Combined transcription:", repr(combined_transcription))
+        print("New transcriptions:", repr(combined_transcription))
+        if existing_lead_score:
+            print("Previous analysis:", repr(existing_lead_score.analysis_summary))
         print("Context:", {
             "client_type": context['client_type'],
             "service": context['service'],
@@ -102,6 +123,7 @@ async def analyze_client_calls(request: ClientIdRequest):
             "first_call": calls[-1].get('first_call'),
             "rota_plan": context['rota_plan']
         })
+
         # Step 1: Get analysis summary
         summary_response = await db.scoring_service.generate_summary(
             transcription=combined_transcription,
@@ -110,29 +132,45 @@ async def analyze_client_calls(request: ClientIdRequest):
             state=calls[-1].get('state'),
             city=calls[-1].get('city'),
             first_call=calls[-1].get('first_call'),
-            rota_plan=context['rota_plan']
+            rota_plan=context['rota_plan'],
+            previous_analysis=existing_lead_score.analysis_summary if existing_lead_score else None
         )
         analysis_summary = summary_response['summary']
+
         # Print analysis summary sent to OpenAI for scoring
         print("==== ANALYSIS SUMMARY SENT TO OPENAI FOR SCORING ====")
         print("Analysis summary:", repr(analysis_summary))
-        # Save or update lead_score with summary
-        existing = await LeadScore.filter(client_id=client_id).first()
-        if existing:
-            await LeadScore.filter(id=existing.id).update(analysis_summary=analysis_summary, updated_at=datetime.now())
-        else:
-            await LeadScore.create(client_id=client_id, callrail_id=None, analysis_summary=analysis_summary, created_at=datetime.now(), updated_at=datetime.now())
+
         # Step 2: Score the summary
         scores = await db.scoring_service.score_summary(analysis_summary)
-        await LeadScore.filter(client_id=client_id).update(
-            intent_score=scores.intent_score,
-            urgency_score=scores.urgency_score,
-            overall_score=scores.overall_score,
-            updated_at=datetime.now()
-        )
+
+        if existing_lead_score:
+            # Update existing record
+            await LeadScore.filter(id=existing_lead_score.id).update(
+                analysis_summary=analysis_summary,
+                intent_score=scores.intent_score,
+                urgency_score=scores.urgency_score,
+                overall_score=scores.overall_score,
+                updated_at=datetime.now()
+            )
+            message = f"Updated existing lead score for client {client_id}"
+        else:
+            # Create new record
+            await LeadScore.create(
+                client_id=client_id,
+                callrail_id=None,
+                analysis_summary=analysis_summary,
+                intent_score=scores.intent_score,
+                urgency_score=scores.urgency_score,
+                overall_score=scores.overall_score,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            message = f"Created new lead score for client {client_id}"
+
         return {
             "status": "success",
-            "message": f"Processed {len(transcriptions)} calls for client {client_id}",
+            "message": message,
             "analysis": {
                 "analysis_summary": analysis_summary,
                 "intent_score": scores.intent_score,
@@ -147,79 +185,74 @@ async def analyze_client_calls(request: ClientIdRequest):
         raise HTTPException(status_code=500, detail=str(e))
         
     
-@router.get("/lead-score/sorted")
-async def get_lead_scores_sorted():
-    try:
-        rows = await LeadScore.all().order_by('-overall_score')
-        # Sort rows by overall_score in descending order
-        rows = [dict(row) for row in rows]
-        for position, row in enumerate(rows, 1):
-            row['position'] = position
-        return {
-            "status": "success",
-            "data": rows
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"An error occurred: {str(e)}"
-        }
-    
+
     
 @router.post("/manual-lead-score")
 async def manual_lead_score(request: ManualLeadScoreRequest):
-    calls = request.calls
-    if not calls:
+    # Early return if no calls
+    if not request.calls:
         return {"status": "success", "message": "No calls provided.", "analysis": None}
-    FIXED_ACCOUNT_ID = "562206937"
-    async def transcribe_call(call):
-        call_recording = call.call_recording
-        if not call_recording or not isinstance(call_recording, str) or not call_recording.strip():
-            return None
-        call_id = db.extract_call_id_from_url(call_recording)
-        if not call_id:
-            return None
-        result = await db.processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
-        return result['transcription'] if result and 'transcription' in result and result['transcription'] else None
-    transcriptions = await asyncio.gather(*[transcribe_call(call) for call in calls])
-    transcriptions = [t for t in transcriptions if t and isinstance(t, str) and t.strip()]
-    if not transcriptions:
-        return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
-    combined_transcription = "\n\n---\n\n".join(transcriptions)
-    if not combined_transcription or not isinstance(combined_transcription, str) or not combined_transcription.strip():
-        return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
-    # Print data sent to OpenAI for analysis summary
-    print("==== DATA SENT TO OPENAI FOR ANALYSIS SUMMARY (MANUAL) ====")
-    print("Combined transcription:", repr(combined_transcription))
-    print("Context:", {
-        "client_type": request.client_type,
-        "service": request.service,
-        "state": calls[-1].state if calls else None,
-        "city": calls[-1].city if calls else None,
-        "first_call": calls[-1].first_call if calls else None,
-        "rota_plan": request.rota_plan
-    })
-    # Step 1: Get analysis summary
-    summary_response = await db.scoring_service.generate_summary(
-        transcription=combined_transcription,
-        client_type=request.client_type,
-        service=request.service,
-        state=calls[-1].state if calls else None,
-        city=calls[-1].city if calls else None,
-        first_call=calls[-1].first_call if calls else None,
-        rota_plan=request.rota_plan
-    )
-    analysis_summary = summary_response['summary']
-    print("==== ANALYSIS SUMMARY SENT TO OPENAI FOR SCORING (MANUAL) ====")
-    print("Analysis summary:", repr(analysis_summary))
-    # Step 2: Score the summary
-    scores = await db.scoring_service.score_summary(analysis_summary)
     
-    # Check if lead score exists for this client_id
+    # Get existing lead score if client_id provided
     existing_lead_score = None
     if request.client_id:
         existing_lead_score = await LeadScore.filter(client_id=request.client_id).first()
     
+    # Process call transcriptions
+    FIXED_ACCOUNT_ID = "562206937"
+    async def transcribe_call(call):
+        if not call.call_recording or not isinstance(call.call_recording, str) or not call.call_recording.strip():
+            return None
+        call_id = db.extract_call_id_from_url(call.call_recording)
+        if not call_id:
+            return None
+        result = await db.processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
+        return result['transcription'] if result and 'transcription' in result and result['transcription'] else None
+    
+    # Get all valid transcriptions
+    transcriptions = await asyncio.gather(*[transcribe_call(call) for call in request.calls])
+    transcriptions = [t for t in transcriptions if t and isinstance(t, str) and t.strip()]
+    if not transcriptions:
+        return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
+    
+    # Combine transcriptions
+    combined_transcription = "\n\n---\n\n".join(transcriptions)
+    if not combined_transcription or not isinstance(combined_transcription, str) or not combined_transcription.strip():
+        return {"status": "success", "message": "No valid transcriptions.", "analysis": None}
+
+    # Log data being sent to OpenAI
+    print("==== DATA SENT TO OPENAI FOR ANALYSIS SUMMARY ====")
+    if existing_lead_score:
+        print("Previous analysis:", repr(existing_lead_score.analysis_summary))
+    print("Context:", {
+        "client_type": request.client_type,
+        "service": request.service,
+        "state": request.calls[-1].state if request.calls else None,
+        "city": request.calls[-1].city if request.calls else None,
+        "first_call": request.calls[-1].first_call if request.calls else None,
+        "rota_plan": request.rota_plan
+    })
+
+    # Generate new analysis summary
+    summary_response = await db.scoring_service.generate_summary(
+        transcription=combined_transcription,
+        client_type=request.client_type,
+        service=request.service,
+        state=request.calls[-1].state if request.calls else None,
+        city=request.calls[-1].city if request.calls else None,
+        first_call=request.calls[-1].first_call if request.calls else None,
+        rota_plan=request.rota_plan,
+        previous_analysis=existing_lead_score.analysis_summary if existing_lead_score else None
+    )
+    analysis_summary = summary_response['summary']
+
+    # Log analysis summary
+    print("==== ANALYSIS SUMMARY SENT TO OPENAI FOR SCORING ====")
+
+    # Get scores for the analysis
+    scores = await db.scoring_service.score_summary(analysis_summary)
+
+    # Update or create lead score record
     if existing_lead_score:
         # Update existing record
         await LeadScore.filter(id=existing_lead_score.id).update(
@@ -243,7 +276,8 @@ async def manual_lead_score(request: ManualLeadScoreRequest):
             updated_at=datetime.now()
         )
         message = f"Created new lead score for client {request.client_id}"
-    
+
+    # Return response
     return {
         "status": "success",
         "message": message,
@@ -256,5 +290,22 @@ async def manual_lead_score(request: ManualLeadScoreRequest):
     }
 
 
-
+@router.get("/lead-score/sorted")
+async def get_lead_scores_sorted():
+    try:
+        rows = await LeadScore.all().order_by('-overall_score')
+        # Sort rows by overall_score in descending order
+        rows = [dict(row) for row in rows]
+        for position, row in enumerate(rows, 1):
+            row['position'] = position
+        return {
+            "status": "success",
+            "data": rows
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"An error occurred: {str(e)}"
+        }
+    
 
