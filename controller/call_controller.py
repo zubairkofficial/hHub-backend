@@ -49,6 +49,7 @@ class ClientIdRequest(BaseModel):
 
 class ManualCallRecording(BaseModel):
     call_recording: str
+    callrail_id: Optional[str] = None
     state: Optional[str] = None
     city: Optional[str] = None
     first_call: Optional[bool] = None
