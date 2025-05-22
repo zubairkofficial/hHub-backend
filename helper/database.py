@@ -23,8 +23,10 @@ class Database:
         self.processor = CallProcessor()
         self.scoring_service = LeadScoringService()
 
+
     async def connect(self):
         return await aiomysql.connect(host=self.host, port=self.port, user=self.user, password=self.password, db=self.db, cursorclass=aiomysql.DictCursor)
+
 
     async def execute(self, query: str, params: tuple = ()):
         async with await self.connect() as conn:
@@ -125,11 +127,6 @@ class Database:
         }
         return await self.insert('export_xml', data)
 
-    def extract_call_id_from_url(self, url: str):
-        match = re.search(r'/calls/([A-Za-z0-9]+)/', url)
-        if match:
-            return match.group(1)
-        return None
 
 
     async def get_client_context_and_calls(self, client_id):
@@ -149,9 +146,9 @@ class Database:
         service = None
         s = await self.fetch("SELECT s.name FROM services s JOIN client_services cs ON s.id = cs.service_id WHERE cs.client_id = %s", (client_id,))
         if not s:
-            s = await self.fetch("SELECT s.name FROM services s JOIN lead_services ls ON s.id = ls.service_id WHERE ls.client_id = %s", (client_id,))
-        if not s:
-            s = await self.fetch("SELECT s.name FROM services s JOIN tasks t ON s.id = t.service_id WHERE t.client_id = %s", (client_id,))
+            # s = await self.fetch("SELECT s.name FROM services s JOIN lead_services ls ON s.id = ls.service_id WHERE ls.client_id = %s", (client_id,))
+            if not s:
+                s = await self.fetch("SELECT s.name FROM services s JOIN tasks t ON s.id = t.service_id WHERE t.client_id = %s", (client_id,))
         if s: service = s[0]['name']
         return {
             'calls': calls,
@@ -159,3 +156,9 @@ class Database:
             'rota_plan': rota_plan,
             'service': service
         }
+
+    async def get_all_client_ids_with_calls(self) -> List[str]:
+        """Fetches all unique client_ids from the callrails table."""
+        query = "SELECT DISTINCT client_id FROM callrails WHERE client_id IS NOT NULL"
+        results = await self.fetch(query)
+        return [row['client_id'] for row in results if row and 'client_id' in row]
