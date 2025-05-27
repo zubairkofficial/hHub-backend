@@ -13,7 +13,9 @@ TORTOISE_CONFIG = {
             'models': [
                 'aerich.models',
                 'models.model',
-                'models.lead_score'
+                'models.lead_score',
+                'models.followup_prediction',
+                'models.chat_history'
             ],
             'default_connection': 'default'
         },
