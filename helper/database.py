@@ -157,8 +157,3 @@ class Database:
             'service': service
         }
 
-    async def get_all_client_ids_with_calls(self) -> List[str]:
-        """Fetches all unique client_ids from the callrails table."""
-        query = "SELECT DISTINCT client_id FROM callrails WHERE client_id IS NOT NULL"
-        results = await self.fetch(query)
-        return [row['client_id'] for row in results if row and 'client_id' in row]

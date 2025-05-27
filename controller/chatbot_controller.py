@@ -45,3 +45,11 @@ async def chatbot_query(request: ChatbotQueryRequest):
         print("Exception occurred in chatbot_query")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}") 
+    
+
+
+
+
+
+
+    
