@@ -1,0 +1,1765 @@
+[
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Query",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Body",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BackgroundTasks",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Request",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Query",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "FastAPI",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Field",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Union",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "CallProcessor",
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "isExtraImport": true,
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "CallProcessor",
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "isExtraImport": true,
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "CallProcessor",
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "isExtraImport": true,
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "Database",
+        "importPath": "helper.database",
+        "description": "helper.database",
+        "isExtraImport": true,
+        "detail": "helper.database",
+        "documentation": {}
+    },
+    {
+        "label": "Database",
+        "importPath": "helper.database",
+        "description": "helper.database",
+        "isExtraImport": true,
+        "detail": "helper.database",
+        "documentation": {}
+    },
+    {
+        "label": "Database",
+        "importPath": "helper.database",
+        "description": "helper.database",
+        "isExtraImport": true,
+        "detail": "helper.database",
+        "documentation": {}
+    },
+    {
+        "label": "Database",
+        "importPath": "helper.database",
+        "description": "helper.database",
+        "isExtraImport": true,
+        "detail": "helper.database",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScoringService",
+        "importPath": "helper.lead_scoring",
+        "description": "helper.lead_scoring",
+        "isExtraImport": true,
+        "detail": "helper.lead_scoring",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScoringService",
+        "importPath": "helper.lead_scoring",
+        "description": "helper.lead_scoring",
+        "isExtraImport": true,
+        "detail": "helper.lead_scoring",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScoringService",
+        "importPath": "helper.lead_scoring",
+        "description": "helper.lead_scoring",
+        "isExtraImport": true,
+        "detail": "helper.lead_scoring",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScore",
+        "importPath": "models.lead_score",
+        "description": "models.lead_score",
+        "isExtraImport": true,
+        "detail": "models.lead_score",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScore",
+        "importPath": "models.lead_score",
+        "description": "models.lead_score",
+        "isExtraImport": true,
+        "detail": "models.lead_score",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScore",
+        "importPath": "models.lead_score",
+        "description": "models.lead_score",
+        "isExtraImport": true,
+        "detail": "models.lead_score",
+        "documentation": {}
+    },
+    {
+        "label": "Q",
+        "importPath": "tortoise.expressions",
+        "description": "tortoise.expressions",
+        "isExtraImport": true,
+        "detail": "tortoise.expressions",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "asyncio",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "asyncio",
+        "description": "asyncio",
+        "detail": "asyncio",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "StreamingResponse",
+        "importPath": "fastapi.responses",
+        "description": "fastapi.responses",
+        "isExtraImport": true,
+        "detail": "fastapi.responses",
+        "documentation": {}
+    },
+    {
+        "label": "httpx",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "httpx",
+        "description": "httpx",
+        "detail": "httpx",
+        "documentation": {}
+    },
+    {
+        "label": "whisper",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "whisper",
+        "description": "whisper",
+        "detail": "whisper",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "uuid",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "uuid",
+        "description": "uuid",
+        "detail": "uuid",
+        "documentation": {}
+    },
+    {
+        "label": "defaultdict",
+        "importPath": "collections",
+        "description": "collections",
+        "isExtraImport": true,
+        "detail": "collections",
+        "documentation": {}
+    },
+    {
+        "label": "dotenv",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "create_sql_agent",
+        "importPath": "langchain_community.agent_toolkits",
+        "description": "langchain_community.agent_toolkits",
+        "isExtraImport": true,
+        "detail": "langchain_community.agent_toolkits",
+        "documentation": {}
+    },
+    {
+        "label": "SQLDatabase",
+        "importPath": "langchain_community.utilities",
+        "description": "langchain_community.utilities",
+        "isExtraImport": true,
+        "detail": "langchain_community.utilities",
+        "documentation": {}
+    },
+    {
+        "label": "ChatOpenAI",
+        "importPath": "langchain_openai",
+        "description": "langchain_openai",
+        "isExtraImport": true,
+        "detail": "langchain_openai",
+        "documentation": {}
+    },
+    {
+        "label": "ChatOpenAI",
+        "importPath": "langchain_openai",
+        "description": "langchain_openai",
+        "isExtraImport": true,
+        "detail": "langchain_openai",
+        "documentation": {}
+    },
+    {
+        "label": "ChatHistory",
+        "importPath": "models.chat_history",
+        "description": "models.chat_history",
+        "isExtraImport": true,
+        "detail": "models.chat_history",
+        "documentation": {}
+    },
+    {
+        "label": "traceback",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "traceback",
+        "description": "traceback",
+        "detail": "traceback",
+        "documentation": {}
+    },
+    {
+        "label": "ChatModel",
+        "importPath": "models.chat",
+        "description": "models.chat",
+        "isExtraImport": true,
+        "detail": "models.chat",
+        "documentation": {}
+    },
+    {
+        "label": "Message",
+        "importPath": "models.message",
+        "description": "models.message",
+        "isExtraImport": true,
+        "detail": "models.message",
+        "documentation": {}
+    },
+    {
+        "label": "init_chat_model",
+        "importPath": "langchain.chat_models",
+        "description": "langchain.chat_models",
+        "isExtraImport": true,
+        "detail": "langchain.chat_models",
+        "documentation": {}
+    },
+    {
+        "label": "FollowupPrediction",
+        "importPath": "models.followup_prediction",
+        "description": "models.followup_prediction",
+        "isExtraImport": true,
+        "detail": "models.followup_prediction",
+        "documentation": {}
+    },
+    {
+        "label": "get_unprocessed_callrail_dates_for_client",
+        "importPath": "helper.follow_helper",
+        "description": "helper.follow_helper",
+        "isExtraImport": true,
+        "detail": "helper.follow_helper",
+        "documentation": {}
+    },
+    {
+        "label": "predict_followup_time",
+        "importPath": "helper.follow_helper",
+        "description": "helper.follow_helper",
+        "isExtraImport": true,
+        "detail": "helper.follow_helper",
+        "documentation": {}
+    },
+    {
+        "label": "FollowupPredictionResponse",
+        "importPath": "helper.follow_helper",
+        "description": "helper.follow_helper",
+        "isExtraImport": true,
+        "detail": "helper.follow_helper",
+        "documentation": {}
+    },
+    {
+        "label": "requests",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "requests",
+        "description": "requests",
+        "detail": "requests",
+        "documentation": {}
+    },
+    {
+        "label": "tempfile",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tempfile",
+        "description": "tempfile",
+        "detail": "tempfile",
+        "documentation": {}
+    },
+    {
+        "label": "urlparse",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "urlparse",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "parse_qs",
+        "importPath": "urllib.parse",
+        "description": "urllib.parse",
+        "isExtraImport": true,
+        "detail": "urllib.parse",
+        "documentation": {}
+    },
+    {
+        "label": "aiohttp",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "aiohttp",
+        "description": "aiohttp",
+        "detail": "aiohttp",
+        "documentation": {}
+    },
+    {
+        "label": "aiomysql",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "aiomysql",
+        "description": "aiomysql",
+        "detail": "aiomysql",
+        "documentation": {}
+    },
+    {
+        "label": "openai",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "openai",
+        "description": "openai",
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "OpenAI",
+        "importPath": "openai",
+        "description": "openai",
+        "isExtraImport": true,
+        "detail": "openai",
+        "documentation": {}
+    },
+    {
+        "label": "ChatPromptTemplate",
+        "importPath": "langchain.prompts",
+        "description": "langchain.prompts",
+        "isExtraImport": true,
+        "detail": "langchain.prompts",
+        "documentation": {}
+    },
+    {
+        "label": "PydanticOutputParser",
+        "importPath": "langchain.output_parsers",
+        "description": "langchain.output_parsers",
+        "isExtraImport": true,
+        "detail": "langchain.output_parsers",
+        "documentation": {}
+    },
+    {
+        "label": "Tortoise",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "Tortoise",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "Model",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "lifespan",
+        "importPath": "helper.tortoise_config",
+        "description": "helper.tortoise_config",
+        "isExtraImport": true,
+        "detail": "helper.tortoise_config",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.controller",
+        "description": "controller.controller",
+        "isExtraImport": true,
+        "detail": "controller.controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "isExtraImport": true,
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.follow_controller",
+        "description": "controller.follow_controller",
+        "isExtraImport": true,
+        "detail": "controller.follow_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.chatbot_controller",
+        "description": "controller.chatbot_controller",
+        "isExtraImport": true,
+        "detail": "controller.chatbot_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.chat_controller",
+        "description": "controller.chat_controller",
+        "isExtraImport": true,
+        "detail": "controller.chat_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "isExtraImport": true,
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CallRecordingRequest",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class CallRecordingRequest(BaseModel):\n    audio_url: str\n    call_id: Optional[str] = None\nclass CallRecordingResponse(BaseModel):\n    status: str\n    transcription: Optional[str] = None\n    language: Optional[str] = None\n    error: Optional[str] = None\n    processed_at: Optional[str] = None\nclass ClientSyncRequest(BaseModel):",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CallRecordingResponse",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class CallRecordingResponse(BaseModel):\n    status: str\n    transcription: Optional[str] = None\n    language: Optional[str] = None\n    error: Optional[str] = None\n    processed_at: Optional[str] = None\nclass ClientSyncRequest(BaseModel):\n    client_id: str\nclass ClientRequest(BaseModel):\n    client_id: str",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ClientSyncRequest",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class ClientSyncRequest(BaseModel):\n    client_id: str\nclass ClientRequest(BaseModel):\n    client_id: str\nclass CallRecording(BaseModel):\n    callrail_id: str\n    call_recording: str\n    name: Optional[str] = None\n    date: Optional[datetime] = None\n    source_type: Optional[str] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ClientRequest",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class ClientRequest(BaseModel):\n    client_id: str\nclass CallRecording(BaseModel):\n    callrail_id: str\n    call_recording: str\n    name: Optional[str] = None\n    date: Optional[datetime] = None\n    source_type: Optional[str] = None\n    phone_number: Optional[str] = None\n    duration: Optional[int] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CallRecording",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class CallRecording(BaseModel):\n    callrail_id: str\n    call_recording: str\n    name: Optional[str] = None\n    date: Optional[datetime] = None\n    source_type: Optional[str] = None\n    phone_number: Optional[str] = None\n    duration: Optional[int] = None\n    country: Optional[str] = None\n    answer: Optional[int] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ClientIdRequest",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class ClientIdRequest(BaseModel):\n    client_id: str\nclass ManualCallRecording(BaseModel):\n    call_recording: str\n    callrail_id: Optional[str] = None\n    state: Optional[str] = None\n    city: Optional[str] = None\n    first_call: Optional[int] = 0\nclass ManualLeadScoreRequest(BaseModel):\n    client_id: Optional[str] = None  # can be null",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ManualCallRecording",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class ManualCallRecording(BaseModel):\n    call_recording: str\n    callrail_id: Optional[str] = None\n    state: Optional[str] = None\n    city: Optional[str] = None\n    first_call: Optional[int] = 0\nclass ManualLeadScoreRequest(BaseModel):\n    client_id: Optional[str] = None  # can be null\n    client_type: Optional[str] = None\n    rota_plan: Optional[str] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ManualLeadScoreRequest",
+        "kind": 6,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "class ManualLeadScoreRequest(BaseModel):\n    client_id: Optional[str] = None  # can be null\n    client_type: Optional[str] = None\n    rota_plan: Optional[str] = None\n    service: Optional[str] = None\n    calls: List[ManualCallRecording]\ndef extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:\n        return match.group(1)",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "extract_call_id_from_url",
+        "kind": 2,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "def extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:\n        return match.group(1)\n    return None\n@router.post(\"/manual-lead-score\")\nasync def manual_lead_score(request: ManualLeadScoreRequest):\n    # Early return if no calls\n    if not request.calls:\n        return {\"status\": \"success\", \"message\": \"No calls provided.\", \"analysis\": None}",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "router = APIRouter()\ndb = Database()\nclass CallRecordingRequest(BaseModel):\n    audio_url: str\n    call_id: Optional[str] = None\nclass CallRecordingResponse(BaseModel):\n    status: str\n    transcription: Optional[str] = None\n    language: Optional[str] = None\n    error: Optional[str] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "db",
+        "kind": 5,
+        "importPath": "controller.call_controller",
+        "description": "controller.call_controller",
+        "peekOfCode": "db = Database()\nclass CallRecordingRequest(BaseModel):\n    audio_url: str\n    call_id: Optional[str] = None\nclass CallRecordingResponse(BaseModel):\n    status: str\n    transcription: Optional[str] = None\n    language: Optional[str] = None\n    error: Optional[str] = None\n    processed_at: Optional[str] = None",
+        "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "extract_call_id_from_url",
+        "kind": 2,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "def extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:\n        return match.group(1)\n    return None\nasync def process_clients_background(client_ids: List[str], session_id: str, user_id: int):\n    \"\"\"Background task to process clients and update progress\"\"\"\n    try:\n        # Initialize session tracking\n        active_sessions[session_id] = {",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "router = APIRouter()\nmodel = whisper.load_model(\"base\")\ndb = Database()\napiurl = os.getenv(\"API_URL\")\nprocessor = CallProcessor()\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "model",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "model = whisper.load_model(\"base\")\ndb = Database()\napiurl = os.getenv(\"API_URL\")\nprocessor = CallProcessor()\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "db",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "db = Database()\napiurl = os.getenv(\"API_URL\")\nprocessor = CallProcessor()\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}\ndef extract_call_id_from_url(url: str):",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "apiurl",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "apiurl = os.getenv(\"API_URL\")\nprocessor = CallProcessor()\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}\ndef extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "processor",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "processor = CallProcessor()\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}\ndef extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CALLRAIL_BEARER_TOKEN",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "CALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nCALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}\ndef extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:\n        return match.group(1)",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CALLRAIL_API_BASE",
+        "kind": 5,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "CALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\n# Store active progress sessions\nactive_sessions: Dict[str, Dict[str, Any]] = {}\ndef extract_call_id_from_url(url: str):\n    match = re.search(r'/calls/([A-Za-z0-9]+)/', url)\n    if match:\n        return match.group(1)\n    return None",
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ChatbotQueryRequest",
+        "kind": 6,
+        "importPath": "controller.chatbot_controller",
+        "description": "controller.chatbot_controller",
+        "peekOfCode": "class ChatbotQueryRequest(BaseModel):\n    user_id: str\n    message: str\nclass ChatHistoryResponse(BaseModel):\n    user_message: str\n    bot_response: str\n    created_at: str\n@router.post(\"/chatbot-query\")\nasync def chatbot_query(request: ChatbotQueryRequest):\n    try:",
+        "detail": "controller.chatbot_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ChatHistoryResponse",
+        "kind": 6,
+        "importPath": "controller.chatbot_controller",
+        "description": "controller.chatbot_controller",
+        "peekOfCode": "class ChatHistoryResponse(BaseModel):\n    user_message: str\n    bot_response: str\n    created_at: str\n@router.post(\"/chatbot-query\")\nasync def chatbot_query(request: ChatbotQueryRequest):\n    try:\n        load_dotenv()\n        db_url = os.getenv(\"DATABASE_URL\")\n        if db_url.startswith(\"mysql://\"):",
+        "detail": "controller.chatbot_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "controller.chatbot_controller",
+        "description": "controller.chatbot_controller",
+        "peekOfCode": "router = APIRouter()\nclass ChatbotQueryRequest(BaseModel):\n    user_id: str\n    message: str\nclass ChatHistoryResponse(BaseModel):\n    user_message: str\n    bot_response: str\n    created_at: str\n@router.post(\"/chatbot-query\")\nasync def chatbot_query(request: ChatbotQueryRequest):",
+        "detail": "controller.chatbot_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ChatCreate",
+        "kind": 6,
+        "importPath": "controller.chat_controller",
+        "description": "controller.chat_controller",
+        "peekOfCode": "class ChatCreate(BaseModel):\n    user_id: str\nclass MessageCreate(BaseModel):\n    user_id: str\n    chat_id: int\n    user_message: str\nclass ChatResponse(BaseModel):\n    id: int\n    user_id: str\n    title: str",
+        "detail": "controller.chat_controller",
+        "documentation": {}
+    },
+    {
+        "label": "MessageCreate",
+        "kind": 6,
+        "importPath": "controller.chat_controller",
+        "description": "controller.chat_controller",
+        "peekOfCode": "class MessageCreate(BaseModel):\n    user_id: str\n    chat_id: int\n    user_message: str\nclass ChatResponse(BaseModel):\n    id: int\n    user_id: str\n    title: str\n    created_at: datetime\n    updated_at: datetime",
+        "detail": "controller.chat_controller",
+        "documentation": {}
+    },
+    {
+        "label": "ChatResponse",
+        "kind": 6,
+        "importPath": "controller.chat_controller",
+        "description": "controller.chat_controller",
+        "peekOfCode": "class ChatResponse(BaseModel):\n    id: int\n    user_id: str\n    title: str\n    created_at: datetime\n    updated_at: datetime\nclass MessageResponse(BaseModel):\n    id: int\n    user_id: str\n    chat_id: int",
+        "detail": "controller.chat_controller",
+        "documentation": {}
+    },
+    {
+        "label": "MessageResponse",
+        "kind": 6,
+        "importPath": "controller.chat_controller",
+        "description": "controller.chat_controller",
+        "peekOfCode": "class MessageResponse(BaseModel):\n    id: int\n    user_id: str\n    chat_id: int\n    user_message: str\n    bot_response: str\n    created_at: datetime\nfrom fastapi import HTTPException, status\n@router.post(\"/chats\", response_model=ChatResponse)\nasync def create_chat(chat_data: ChatCreate):",
+        "detail": "controller.chat_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "controller.controller",
+        "description": "controller.controller",
+        "peekOfCode": "router = APIRouter()",
+        "detail": "controller.controller",
+        "documentation": {}
+    },
+    {
+        "label": "FollowupPredictionRequest",
+        "kind": 6,
+        "importPath": "controller.follow_controller",
+        "description": "controller.follow_controller",
+        "peekOfCode": "class FollowupPredictionRequest(BaseModel):\n    client_id: int\n    call_dates: List[str]  # List of dates in \"YYYY-MM-DD HH:MM:SS\" format\n# @router.post(\"/predict-followup/{client_id}\")\n# async def predict_followup_time_endpoint(\n#     client_id: int,\n#     db: Database = Depends()\n# ):\n#     try:\n#         print(f\"Starting predict_followup_time_endpoint for client_id: {client_id}\")",
+        "detail": "controller.follow_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "controller.follow_controller",
+        "description": "controller.follow_controller",
+        "peekOfCode": "router = APIRouter()\nclass FollowupPredictionRequest(BaseModel):\n    client_id: int\n    call_dates: List[str]  # List of dates in \"YYYY-MM-DD HH:MM:SS\" format\n# @router.post(\"/predict-followup/{client_id}\")\n# async def predict_followup_time_endpoint(\n#     client_id: int,\n#     db: Database = Depends()\n# ):\n#     try:",
+        "detail": "controller.follow_controller",
+        "documentation": {}
+    },
+    {
+        "label": "CallProcessor",
+        "kind": 6,
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "peekOfCode": "class CallProcessor:\n    def __init__(self):\n        self.bearer_token = CALLRAIL_BEARER_TOKEN\n        # Initialize Whisper model\n        self.model = whisper.load_model(\"base\")\n    async def get_recording_url(self, account_id: str, call_id: str) -> Optional[str]:\n        url = f\"{CALLRAIL_API_BASE}/a/{account_id}/calls/{call_id}.json\"\n        headers = {\"Authorization\": f\"Bearer {self.bearer_token}\"}\n        async with aiohttp.ClientSession() as session:\n            async with session.get(url, headers=headers) as response:",
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "CALLRAIL_API_BASE",
+        "kind": 5,
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "peekOfCode": "CALLRAIL_API_BASE = \"https://api.callrail.com/v3\"\nCALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\nclass CallProcessor:\n    def __init__(self):\n        self.bearer_token = CALLRAIL_BEARER_TOKEN\n        # Initialize Whisper model\n        self.model = whisper.load_model(\"base\")\n    async def get_recording_url(self, account_id: str, call_id: str) -> Optional[str]:",
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "CALLRAIL_BEARER_TOKEN",
+        "kind": 5,
+        "importPath": "helper.call_processor",
+        "description": "helper.call_processor",
+        "peekOfCode": "CALLRAIL_BEARER_TOKEN = os.getenv(\"CALLRAIL_BEARER_TOKEN\")\nif not CALLRAIL_BEARER_TOKEN:\n    raise ValueError(\"CALLRAIL_BEARER_TOKEN not found in environment variables\")\nclass CallProcessor:\n    def __init__(self):\n        self.bearer_token = CALLRAIL_BEARER_TOKEN\n        # Initialize Whisper model\n        self.model = whisper.load_model(\"base\")\n    async def get_recording_url(self, account_id: str, call_id: str) -> Optional[str]:\n        url = f\"{CALLRAIL_API_BASE}/a/{account_id}/calls/{call_id}.json\"",
+        "detail": "helper.call_processor",
+        "documentation": {}
+    },
+    {
+        "label": "Database",
+        "kind": 6,
+        "importPath": "helper.database",
+        "description": "helper.database",
+        "peekOfCode": "class Database:\n    def __init__(self) -> None:\n        self.host = os.getenv('DB_HOST')\n        self.port = int(os.getenv('DB_PORT'))\n        self.user = os.getenv('DB_USER')\n        self.password = os.getenv('DB_PASSWORD')\n        self.db = os.getenv('DB_NAME')\n        self.processor = CallProcessor()\n        self.scoring_service = LeadScoringService()\n    async def connect(self):",
+        "detail": "helper.database",
+        "documentation": {}
+    },
+    {
+        "label": "FollowupPredictionResponse",
+        "kind": 6,
+        "importPath": "helper.follow_helper",
+        "description": "helper.follow_helper",
+        "peekOfCode": "class FollowupPredictionResponse(BaseModel):\n    predicted_followup_time: str\n    class Config:\n        schema_extra = {\n            \"example\": {\n                \"predicted_followup_time\": \"YYYY-MM-DD HH:MM:SS\"\n            }\n        }\nasync def get_unprocessed_callrail_dates_for_client(db: Database, client_id: int) -> List[Dict[str, Any]]:\n    \"\"\"Fetches unprocessed CallRail records for a client and marks them as processed.\"\"\"",
+        "detail": "helper.follow_helper",
+        "documentation": {}
+    },
+    {
+        "label": "LeadAnalysis",
+        "kind": 6,
+        "importPath": "helper.lead_scoring",
+        "description": "helper.lead_scoring",
+        "peekOfCode": "class LeadAnalysis(BaseModel):\n    intent_score: float = Field(description=\"Score for customer intent (0-100)\")\n    urgency_score: float = Field(description=\"Score for urgency level (0-100)\")\n    overall_score: float = Field(description=\"Combined score (0-100)\")\n    analysis_summary: str = Field(description=\"Comprehensive analysis incorporating all provided data\")\nclass LeadScoringService:\n    def __init__(self):\n        self.llm = ChatOpenAI(\n            model=\"gpt-4o-mini\",\n            temperature=0,",
+        "detail": "helper.lead_scoring",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScoringService",
+        "kind": 6,
+        "importPath": "helper.lead_scoring",
+        "description": "helper.lead_scoring",
+        "peekOfCode": "class LeadScoringService:\n    def __init__(self):\n        self.llm = ChatOpenAI(\n            model=\"gpt-4o-mini\",\n            temperature=0,\n            api_key=os.getenv(\"OPENAI_API_KEY\")\n        )\n        self.parser = PydanticOutputParser(pydantic_object=LeadAnalysis)\n        self.summary_prompt = ChatPromptTemplate.from_messages([\n            (\"system\", \"\"\"You are an expert call analyst. Given the following call transcriptions, previous analysis (if any), and client context, write a comprehensive analysis summary that incorporates both historical and new information.\\n\\nContext:\\n- Client Type: {client_type}\\n- Service: {service}\\n- Location: {state}, {city}\\n- First Call: {first_call}\\n- Rota Plan: {rota_plan}\\n\\nPrevious Analysis (if any):\\n{previous_analysis}\\n\\nNew Call Transcriptions:\\n{transcription}\\n\\nWrite a single, comprehensive analysis summary that incorporates all the provided data, including both historical context from previous analysis and new information from recent calls. Explain how each factor influences the lead's potential and highlight any changes or developments in the client's situation.\"\"\"),",
+        "detail": "helper.lead_scoring",
+        "documentation": {}
+    },
+    {
+        "label": "TORTOISE_CONFIG",
+        "kind": 5,
+        "importPath": "helper.tortoise_config",
+        "description": "helper.tortoise_config",
+        "peekOfCode": "TORTOISE_CONFIG = {\n    'connections': {\n        'default': os.getenv('DATABASE_URL')\n    },\n    'apps': {\n        'models': {\n            'models': [\n                'aerich.models',\n                'models.model',\n                'models.lead_score',",
+        "detail": "helper.tortoise_config",
+        "documentation": {}
+    },
+    {
+        "label": "ChatModel",
+        "kind": 6,
+        "importPath": "models.chat",
+        "description": "models.chat",
+        "peekOfCode": "class ChatModel(models.Model):\n    id = fields.IntField(pk=True)\n    user_id = fields.CharField(max_length=100)\n    title = fields.CharField(max_length=255, default=\"New Chat\")\n    created_at = fields.DatetimeField(auto_now_add=True)\n    updated_at = fields.DatetimeField(auto_now=True)",
+        "detail": "models.chat",
+        "documentation": {}
+    },
+    {
+        "label": "ChatHistory",
+        "kind": 6,
+        "importPath": "models.chat_history",
+        "description": "models.chat_history",
+        "peekOfCode": "class ChatHistory(models.Model):\n    id = fields.IntField(pk=True)\n    user_id = fields.CharField(max_length=100)\n    user_message = fields.TextField()\n    bot_response = fields.TextField()\n    created_at = fields.DatetimeField(auto_now_add=True)\n    class Meta:\n        table = \"chat_history\"",
+        "detail": "models.chat_history",
+        "documentation": {}
+    },
+    {
+        "label": "FollowupPrediction",
+        "kind": 6,
+        "importPath": "models.followup_prediction",
+        "description": "models.followup_prediction",
+        "peekOfCode": "class FollowupPrediction(models.Model):\n    id = fields.IntField(pk=True)\n    client_id = fields.IntField(null=True)\n    predicted_followup_time = fields.DatetimeField(null=True)\n    class Meta:\n        table = \"followup_prediction\"",
+        "detail": "models.followup_prediction",
+        "documentation": {}
+    },
+    {
+        "label": "LeadScore",
+        "kind": 6,
+        "importPath": "models.lead_score",
+        "description": "models.lead_score",
+        "peekOfCode": "class LeadScore(models.Model):\n    id = fields.IntField(pk=True)\n    client_id = fields.CharField(max_length=255, null=True)\n    callrail_id = fields.CharField(max_length=255, null=True)\n    analysis_summary = fields.TextField(null=True)\n    created_at = fields.DatetimeField(null=True)\n    updated_at = fields.DatetimeField(null=True)\n    phone = fields.CharField(max_length=15,null=True)\n    deleted_at = fields.DatetimeField(null=True)\n    intent_score = fields.FloatField(null=True)",
+        "detail": "models.lead_score",
+        "documentation": {}
+    },
+    {
+        "label": "Message",
+        "kind": 6,
+        "importPath": "models.message",
+        "description": "models.message",
+        "peekOfCode": "class Message(models.Model):\n    id = fields.IntField(pk=True)\n    user_id = fields.CharField(max_length=100)\n    chat_id = fields.IntField()\n    user_message = fields.TextField()\n    bot_response = fields.TextField()\n    created_at = fields.DatetimeField(auto_now_add=True)",
+        "detail": "models.message",
+        "documentation": {}
+    },
+    {
+        "label": "Lead_Ranks",
+        "kind": 6,
+        "importPath": "models.model",
+        "description": "models.model",
+        "peekOfCode": "class Lead_Ranks(Model):\n    id = fields.IntField(pk=True)\n    name = fields.CharField(max_length=255)\n    description = fields.TextField()\n    created_at = fields.DatetimeField(auto_now_add=True)\n    updated_at = fields.DatetimeField(auto_now=True)",
+        "detail": "models.model",
+        "documentation": {}
+    },
+    {
+        "label": "default_api",
+        "kind": 2,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "def default_api():\n    return \"Hello to the world of AI\"",
+        "detail": "main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "kind": 5,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "app = FastAPI(lifespan=lifespan)\n# Include the routers\napp.include_router(lead_router, prefix=\"/api/v1\", tags=[\"lead-scoring\"])\napp.include_router(call_router, prefix=\"/api/v1\", tags=[\"call-analysis\"])\napp.include_router(follow_router, prefix=\"/api/v1\", tags=[\"followup-prediction\"])\napp.include_router(chatbot_router, prefix=\"/api/v1\", tags=[\"chatbot\"])\napp.include_router(chat_routre, prefix=\"/api\", tags=[\"chat\"])\napp.include_router(transcript_router, prefix=\"/api\", tags=[\"transcript\"])\n@app.get('/')\ndef default_api():",
+        "detail": "main",
+        "documentation": {}
+    }
+]

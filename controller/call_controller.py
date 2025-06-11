@@ -149,6 +149,7 @@ async def manual_lead_score(request: ManualLeadScoreRequest):
             client_id=request.client_id,
             callrail_id=None,
             analysis_summary=analysis_summary,
+            phone=request.phone_number,
             intent_score=scores.intent_score,
             urgency_score=scores.urgency_score,
             overall_score=scores.overall_score,

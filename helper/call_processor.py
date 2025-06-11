@@ -36,6 +36,8 @@ class CallProcessor:
                 print(f"Recording URL: {recording_url}")
                 return recording_url
 
+
+
     async def download_audio(self, audio_url: str) -> Optional[str]:
         headers = {"Authorization": f"Bearer {self.bearer_token}"}
         try:
@@ -116,10 +118,4 @@ class CallProcessor:
             'processed_at': datetime.now().isoformat()
         }
 
-# Example usage:
-# import asyncio
-# async def main():
-#     processor = CallProcessor()
-#     result = await processor.process_call(account_id='YOUR_ACCOUNT_ID', call_id='YOUR_CALL_ID')
-#     print(result)
-# asyncio.run(main())
+
