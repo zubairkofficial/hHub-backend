@@ -9,10 +9,24 @@ import os
 from dotenv import load_dotenv
 import time
 from dotenv import load_dotenv
+from controller.call_transcript_controller import headers
 
 load_dotenv()
 
 LARAVEL_API_URL  = os.getenv("API_URL")
+
+
+headers = {
+    "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+}
 
 
 prompt = ChatPromptTemplate.from_messages([
@@ -62,7 +76,7 @@ async def get_clinics_by_client(user_id: int):
             url = f"{LARAVEL_API_URL}/api/clinic/{user_id}"
             print(f"Making fresh API call to: {url}")
             
-            response = await client.get(url)
+            response = await client.get(url,headers=headers)
             print(f"Response status code: {response.status_code}")
             
             if response.status_code == 200:

@@ -1159,6 +1159,22 @@
         "documentation": {}
     },
     {
+        "label": "headers",
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "isExtraImport": true,
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "isExtraImport": true,
+        "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
         "label": "ChatPromptTemplate",
         "importPath": "langchain.prompts",
         "description": "langchain.prompts",
@@ -1495,14 +1511,6 @@
         "documentation": {}
     },
     {
-        "label": "router",
-        "importPath": "controller.call_transcript_controller",
-        "description": "controller.call_transcript_controller",
-        "isExtraImport": true,
-        "detail": "controller.call_transcript_controller",
-        "documentation": {}
-    },
-    {
         "label": "CallRecordingRequest",
         "kind": 6,
         "importPath": "controller.call_controller",
@@ -1824,6 +1832,15 @@
         "description": "helper.follow_helper",
         "peekOfCode": "class FollowupPredictionResponse(BaseModel):\n    predicted_followup_time: str\n    class Config:\n        schema_extra = {\n            \"example\": {\n                \"predicted_followup_time\": \"YYYY-MM-DD HH:MM:SS\"\n            }\n        }\nasync def get_unprocessed_callrail_dates_for_client(db: Database, client_id: int) -> List[Dict[str, Any]]:\n    \"\"\"Fetches unprocessed CallRail records for a client and marks them as processed.\"\"\"",
         "detail": "helper.follow_helper",
+        "documentation": {}
+    },
+    {
+        "label": "headers",
+        "kind": 5,
+        "importPath": "helper.get_chat_response",
+        "description": "helper.get_chat_response",
+        "peekOfCode": "headers = {\n    \"sec-ch-ua\": '\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"',\n    \"sec-ch-ua-mobile\": \"?0\",\n    \"sec-ch-ua-platform\": '\"Windows\"',\n    \"sec-fetch-dest\": \"document\",\n    \"sec-fetch-mode\": \"navigate\",\n    \"sec-fetch-site\": \"none\",\n    \"sec-fetch-user\": \"?1\",\n    \"upgrade-insecure-requests\": \"1\",\n    \"user-agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36\"",
+        "detail": "helper.get_chat_response",
         "documentation": {}
     },
     {

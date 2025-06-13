@@ -16,4 +16,4 @@ class LeadScore(models.Model):
     class Meta:
         table = "lead_score"
         ordering = ["-overall_score"]
-        
+        # S!mpl3P@ssw0rd

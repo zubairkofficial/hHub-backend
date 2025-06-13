@@ -62,7 +62,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
     try:
         # Initialize session tracking
         active_sessions[session_id] = {
-            'total': len(client_ids),
+            'total': 0,
             'processed': 0,
             'details': [],
             'status': 'processing'
@@ -78,6 +78,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                 call for call in call_data.get("data", [])
                 if call.get("client_id") in client_ids
             ]
+            active_sessions[session_id]['total'] = len(filtered_calls)
             
             # Group calls by phone number
             phone_groups = {}
@@ -109,6 +110,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                 return result['transcription'] if result and 'transcription' in result and result['transcription'] else None
             
             for phone_number, group_data in phone_groups.items():
+                print("in for loop ")
                 try:
                     # Update progress
                     active_sessions[session_id]['details'].append({
@@ -127,6 +129,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     valid_transcriptions = [t for t in transcriptions if t and isinstance(t, str) and t.strip()]
                     
                     if not valid_transcriptions:
+                        print("the transcipt is not valid")
                         active_sessions[session_id]['details'].append({
                             'message': f'No valid transcriptions for {phone_number}',
                             'status': 'skipped'
@@ -138,10 +141,10 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     
                     # Check if lead score already exists for this phone number
                     existing_lead_score = await LeadScore.filter(phone=phone_number).first()
-                    
+                    print(f"existing lead socre {existing_lead_score}")
                     # Get the most recent call data for context
                     recent_call = group_data["calls"][-1]
-                    
+                    print("genrette summary")
                     # Generate analysis summary
                     summary_response = await db.scoring_service.generate_summary(
                         transcription=combined_transcription,
@@ -157,9 +160,11 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     
                     # Get scores for the analysis
                     scores = await db.scoring_service.score_summary(analysis_summary)
-                    
+                    print(f"score of this lead {scores}")
                     # Update or create lead score record
+                    print("update or create ")
                     if existing_lead_score:
+                        print("lead is exist and updating it")
                         await LeadScore.filter(id=existing_lead_score.id).update(
                             analysis_summary=analysis_summary,
                             intent_score=scores.intent_score,
@@ -169,6 +174,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                         )
                         message = f"Updated lead score for {phone_number}"
                     else:
+                        print("no lead so create new one")
                         await LeadScore.create(
                             client_id=recent_call.get("client_id"),
                             callrail_id=None,
@@ -441,6 +447,7 @@ async def get_call_data():
                         }
                     })
                 
+                print(results)
                 if results:
                     return {
                         "status": "success",
