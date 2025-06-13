@@ -28,6 +28,18 @@ db = Database()
 
 apiurl = os.getenv("API_URL")
 
+headers = {
+    "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+}
+
 
 processor = CallProcessor()
 CALLRAIL_BEARER_TOKEN = os.getenv("CALLRAIL_BEARER_TOKEN")
@@ -58,10 +70,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
         
         # Fetch call data for the specific client IDs
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{apiurl}/api/transcript")
-            if response.status_code != 200:
-                raise Exception(f"Failed to fetch call data: {response.status_code}")
-            
+            response = await client.get(f"{apiurl}/api/transcript",headers=headers)
             call_data = response.json()
             
             # Filter calls by client_ids
@@ -314,7 +323,8 @@ async def progress_stream(session_id: str):
 async def get_call_data():
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{apiurl}/api/transcript")
+            
+            response = await client.get(f"{apiurl}/api/transcript",headers=headers)
             if response.status_code == 200:
                 call_data = response.json()
                 

@@ -7,8 +7,22 @@ from models.chat import ChatModel as Chat
 from models.message import Message
 from fastapi import HTTPException, status
 from datetime import datetime
-from langchain.chat_models import init_chat_model
+from helper.get_chat_response import generate_ai_response
+from dotenv import load_dotenv
+import os
+from fastapi import HTTPException, status
+import httpx
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic import BaseModel
+from typing import List
+from datetime import datetime
+
+load_dotenv()
+
 router= APIRouter()
+
+
+LARAVEL_API_URL  = os.getenv("API_URL")
 
 class ChatCreate(BaseModel):
     user_id: str
@@ -33,7 +47,9 @@ class MessageResponse(BaseModel):
     bot_response: str
     created_at: datetime
 
-from fastapi import HTTPException, status
+
+class ErrorResponse(BaseModel):
+    detail: str
 
 @router.post("/chats", response_model=ChatResponse)
 async def create_chat(chat_data: ChatCreate):
@@ -99,13 +115,12 @@ async def get_chat_messages(chat_id: int, user_id: str):
     ) for msg in messages]
 
 
-
 @router.post("/messages", response_model=MessageResponse)
 async def send_message(message_data: MessageCreate):
     """Send a message and get AI response"""
     try:
         # Generate AI response (replace with your AI service)
-        ai_response = await generate_ai_response(message_data.user_message)
+        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id)
         
         # Save message to database
         message = await Message.create(
@@ -149,10 +164,25 @@ async def send_message(message_data: MessageCreate):
             detail="An error occurred while sending the message. Please try again later."
         )
 
+@router.delete("/chats/{chat_id}")
+async def delete_chat(chat_id: int):
+    """Delete a chat and all its associated messages."""
+    try:
+        # Delete all messages associated with the chat
+        await Message.filter(chat_id=chat_id).delete()
 
-async def generate_ai_response(user_message: str) -> str:
-    """Generate AI response - replace with your preferred AI service"""
-    # This is a placeholder - integrate with OpenAI, Claude, or your preferred AI service
-    model = init_chat_model("gpt-4o-mini", model_provider="openai")
-    response = await model.ainvoke(user_message)
-    return response.content
+        # Delete the chat itself
+        chat = await Chat.get(id=chat_id)
+        if chat:
+            await chat.delete()
+            return {"message": "Chat and associated messages deleted successfully."}
+        else:
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+    except Exception as e:  
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
+
+
+
+
+  
