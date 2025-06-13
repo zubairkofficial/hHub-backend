@@ -141,7 +141,18 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     
                     # Check if lead score already exists for this phone number
                     existing_lead_score = await LeadScore.filter(phone=phone_number).first()
-                    print(f"existing lead socre {existing_lead_score}")
+                    existing_lead_score = await LeadScore.filter(phone=phone_number).first()
+
+                    # Check if a record is found
+                    if existing_lead_score:
+                        # Print the details you need from the existing lead score
+                        print(f"Existing Lead Score Details:")
+                        print(f"ID: {existing_lead_score.id}")
+                        print(f"Client ID: {existing_lead_score.client_id}")
+                        print(f"Name: {existing_lead_score.name}")
+                    else:
+                        print("No existing lead score found for this phone number.")
+
                     # Get the most recent call data for context
                     recent_call = group_data["calls"][-1]
                     print("genrette summary")
