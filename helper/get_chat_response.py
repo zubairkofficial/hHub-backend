@@ -46,7 +46,7 @@ async def generate_ai_response(user_message: str, chat_id: str, user_id: str) ->
 
       
         actual_data = response_data.get("data", {}) if response_data.get("success") else None
-
+        print(f"this data send to ai {actual_data}")
         
         response = await chain.ainvoke({
             "data": actual_data,  
