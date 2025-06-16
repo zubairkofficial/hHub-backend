@@ -112,7 +112,7 @@ async def get_chat_messages(chat_id: int, user_id: str):
         bot_response=msg.bot_response,
         created_at=msg.created_at
     ) for msg in messages]
-
+  
 
 @router.post("/messages", response_model=MessageResponse)
 async def send_message(message_data: MessageCreate):
