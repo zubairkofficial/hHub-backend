@@ -169,7 +169,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     analysis_summary = summary_response['summary']
                     
                     # Get scores for the analysis
-                    scores = await db.scoring_service.re_score_summary(analysis_summary)
+                    scores = await db.scoring_service.score_summary(analysis_summary)
                     print(f"score of this lead {scores}")
                     # Update or create lead score record
                     print("update or create ")
@@ -535,7 +535,7 @@ async def re_score_lead(leadId: str):
         new_analysis_summary = summary_response['summary']
 
         print(f"Getting new scores for lead ID: {leadId}")
-        updated_scores = await db.scoring_service.re_score_summary(new_analysis_summary)
+        updated_scores = await db.scoring_service.score_summary(new_analysis_summary)
 
         print(f"Updated scores: {updated_scores}")
         if not updated_scores:
