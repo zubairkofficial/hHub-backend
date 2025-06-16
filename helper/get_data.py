@@ -20,23 +20,10 @@ headers = {
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 }
 
-clinic_cache = {}
-CACHE_EXPIRY_TIME = 3000  
-
 async def get_client_data(user_id: int):
-    current_time = time.time()
-
-    if user_id in clinic_cache:
-        cached_data, cached_time = clinic_cache[user_id]
-        if current_time - cached_time < CACHE_EXPIRY_TIME:
-            print(f"Using cached data for user {user_id}")
-            return cached_data
-        else:
-            print(f"Cache expired for user {user_id}, removing from cache")
-            del clinic_cache[user_id]
-
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
+            # Always make a fresh API call by skipping cache logic
             url = f"{LARAVEL_API_URL}/api/clinic/{user_id}"
             print(f"Making fresh API call to: {url}")
             
@@ -48,9 +35,6 @@ async def get_client_data(user_id: int):
                 print(f"Response data: {clinics}")
                 
                 if clinics.get('success', False):
-                    clinic_cache[user_id] = (clinics['data'], current_time)
-                    print(f"Cached successful data for user {user_id}")
-
                     # Process and format the data into the desired structure
                     formatted_data = format_client_data(clinics['data'])
                     return formatted_data
@@ -80,14 +64,13 @@ async def get_client_data(user_id: int):
 def format_client_data(data):
     formatted_data = {}
 
-   
+    # List of tables to format the data
     tables = [
-        "automation_template", "bookings", "clinics",
+        "automation_templates", "bookings", "clinics",
         "client_service_history", "clients", "client_types", 
         "requests", "request_types", "dynamic_schedule_booking"
     ]
-    
-   
+
     for table in tables:
         table_data = data.get(table, [])
         if table_data:
@@ -96,6 +79,6 @@ def format_client_data(data):
                 row = {key: entry[key] for key in entry.keys()}
                 formatted_data[table].append(row)
 
-    
+    # Convert to JSON formatted string with indentation
     formatted_json = json.dumps(formatted_data, indent=4)
     return formatted_json
