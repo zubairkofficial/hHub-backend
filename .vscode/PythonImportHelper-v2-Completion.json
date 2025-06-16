@@ -1897,6 +1897,24 @@
         "documentation": {}
     },
     {
+        "label": "clinic_cache",
+        "kind": 5,
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "clinic_cache = {}\nCACHE_EXPIRY_TIME = 600  # 10 minutes in seconds\nasync def get_client_data(user_id: int):\n    current_time = time.time()\n    # Check if the data is in the cache and not expired\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data",
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
+        "label": "CACHE_EXPIRY_TIME",
+        "kind": 5,
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "CACHE_EXPIRY_TIME = 600  # 10 minutes in seconds\nasync def get_client_data(user_id: int):\n    current_time = time.time()\n    # Check if the data is in the cache and not expired\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data\n        else:",
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
         "label": "LeadAnalysis",
         "kind": 6,
         "importPath": "helper.lead_scoring",
