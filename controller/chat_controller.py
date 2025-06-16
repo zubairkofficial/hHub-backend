@@ -16,7 +16,6 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
-from fastapi import BackgroundTasks
 load_dotenv()
 
 router= APIRouter()
@@ -116,11 +115,11 @@ async def get_chat_messages(chat_id: int, user_id: str):
 
 
 @router.post("/messages", response_model=MessageResponse)
-async def send_message(message_data: MessageCreate,background_tasks: BackgroundTasks):
+async def send_message(message_data: MessageCreate):
     """Send a message and get AI response"""
     try:
         # Generate AI response (replace with your AI service)
-        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id,background_tasks)
+        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id)
         
         # Save message to database
         message = await Message.create(
