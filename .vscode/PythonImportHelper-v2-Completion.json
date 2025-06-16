@@ -1879,15 +1879,6 @@
         "documentation": {}
     },
     {
-        "label": "format_client_data",
-        "kind": 2,
-        "importPath": "helper.get_data",
-        "description": "helper.get_data",
-        "peekOfCode": "def format_client_data(data):\n    formatted_data = {}\n    # List of tables to format the data\n    tables = [\n        \"automation_templates\", \"bookings\", \"clinics\",\n        \"client_service_history\", \"clients\", \"client_types\", \n        \"requests\", \"request_types\", \"dynamic_schedule_booking\"\n    ]\n    for table in tables:\n        table_data = data.get(table, [])",
-        "detail": "helper.get_data",
-        "documentation": {}
-    },
-    {
         "label": "LARAVEL_API_URL",
         "kind": 5,
         "importPath": "helper.get_data",

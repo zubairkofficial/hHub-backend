@@ -43,31 +43,16 @@ import json
 
 async def generate_ai_response(user_message: str, chat_id: str, user_id: str) -> str:
     try:
-        
         history = await get_chat_history(int(chat_id))
         response_data = await get_client_data(int(user_id))
 
-        
-        if isinstance(response_data, str):
-            try:
-                
-                response_data = json.loads(response_data)
-            except json.JSONDecodeError as e:
-                print(f"Error decoding JSON: {str(e)}")
-                return "Failed to parse response data."
-
-      
-        actual_data = response_data.get("data", {}) if response_data.get("success") else None
-        
-   
-        if actual_data:
-            print(f"This data sent to AI: {actual_data}")
+        if response_data:
+            print(f"This data sent to AI: {response_data}")
         else:
-            print(f"No data available to send to AI. {actual_data}")
-        
-        
+            print(f"No data available to send to AI. {response_data}")
+         
         response = await chain.ainvoke({
-            "data": actual_data,  
+            "data": response_data,
             "history": history,
             "prompt": user_message
         })
@@ -75,6 +60,5 @@ async def generate_ai_response(user_message: str, chat_id: str, user_id: str) ->
         return response
 
     except Exception as e:
-        # Handle errors and return a user-friendly message
         print(f"Error while getting AI response: {str(e)}")
         return "Sorry, I encountered an error. Please try again."
