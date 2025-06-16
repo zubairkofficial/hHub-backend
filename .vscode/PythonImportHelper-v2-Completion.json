@@ -160,6 +160,14 @@
         "documentation": {}
     },
     {
+        "label": "BackgroundTasks",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "APIRouter",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -193,14 +201,6 @@
     },
     {
         "label": "Depends",
-        "importPath": "fastapi",
-        "description": "fastapi",
-        "isExtraImport": true,
-        "detail": "fastapi",
-        "documentation": {}
-    },
-    {
-        "label": "HTTPException",
         "importPath": "fastapi",
         "description": "fastapi",
         "isExtraImport": true,
@@ -912,6 +912,14 @@
         "documentation": {}
     },
     {
+        "label": "load_dotenv",
+        "importPath": "dotenv",
+        "description": "dotenv",
+        "isExtraImport": true,
+        "detail": "dotenv",
+        "documentation": {}
+    },
+    {
         "label": "create_sql_agent",
         "importPath": "langchain_community.agent_toolkits",
         "description": "langchain_community.agent_toolkits",
@@ -1150,15 +1158,6 @@
         "documentation": {}
     },
     {
-        "label": "time",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "time",
-        "description": "time",
-        "detail": "time",
-        "documentation": {}
-    },
-    {
         "label": "headers",
         "importPath": "controller.call_transcript_controller",
         "description": "controller.call_transcript_controller",
@@ -1172,6 +1171,23 @@
         "description": "controller.call_transcript_controller",
         "isExtraImport": true,
         "detail": "controller.call_transcript_controller",
+        "documentation": {}
+    },
+    {
+        "label": "get_client_data",
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "isExtraImport": true,
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
         "documentation": {}
     },
     {
@@ -1821,7 +1837,7 @@
         "kind": 6,
         "importPath": "helper.database",
         "description": "helper.database",
-        "peekOfCode": "class Database:\n    def __init__(self) -> None:\n        self.host = os.getenv('DB_HOST')\n        self.port = int(os.getenv('DB_PORT'))\n        self.user = os.getenv('DB_USER')\n        self.password = os.getenv('DB_PASSWORD')\n        self.db = os.getenv('DB_NAME')\n        self.processor = CallProcessor()\n        self.scoring_service = LeadScoringService()\n    async def connect(self):",
+        "peekOfCode": "class Database:\n    def __init__(self) -> None:\n        self.host = os.getenv('DB_HOST')\n        self.port = int(os.getenv('DB_PORT'))\n        self.user = os.getenv('DB_USER')\n        self.password = os.getenv('DB_PASSWORD')\n        self.db = os.getenv('DB_NAME')\n        self.processor = CallProcessor()\n        self.scoring_service = LeadScoringService()\n        self.re_scoring_service = LeadScoringService()",
         "detail": "helper.database",
         "documentation": {}
     },
@@ -1832,15 +1848,6 @@
         "description": "helper.follow_helper",
         "peekOfCode": "class FollowupPredictionResponse(BaseModel):\n    predicted_followup_time: str\n    class Config:\n        schema_extra = {\n            \"example\": {\n                \"predicted_followup_time\": \"YYYY-MM-DD HH:MM:SS\"\n            }\n        }\nasync def get_unprocessed_callrail_dates_for_client(db: Database, client_id: int) -> List[Dict[str, Any]]:\n    \"\"\"Fetches unprocessed CallRail records for a client and marks them as processed.\"\"\"",
         "detail": "helper.follow_helper",
-        "documentation": {}
-    },
-    {
-        "label": "headers",
-        "kind": 5,
-        "importPath": "helper.get_chat_response",
-        "description": "helper.get_chat_response",
-        "peekOfCode": "headers = {\n    \"sec-ch-ua\": '\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"',\n    \"sec-ch-ua-mobile\": \"?0\",\n    \"sec-ch-ua-platform\": '\"Windows\"',\n    \"sec-fetch-dest\": \"document\",\n    \"sec-fetch-mode\": \"navigate\",\n    \"sec-fetch-site\": \"none\",\n    \"sec-fetch-user\": \"?1\",\n    \"upgrade-insecure-requests\": \"1\",\n    \"user-agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36\"",
-        "detail": "helper.get_chat_response",
         "documentation": {}
     },
     {
@@ -1880,21 +1887,48 @@
         "documentation": {}
     },
     {
+        "label": "format_client_data",
+        "kind": 2,
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "def format_client_data(data):\n    formatted_data = {}\n    tables = [\n        \"automation_template\", \"bookings\", \"clinics\",\n        \"client_service_history\", \"clients\", \"client_types\", \n        \"requests\", \"request_types\", \"dynamic_schedule_booking\"\n    ]\n    for table in tables:\n        table_data = data.get(table, [])\n        if table_data:",
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
+        "label": "LARAVEL_API_URL",
+        "kind": 5,
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "LARAVEL_API_URL = os.getenv(\"API_URL\")\nheaders = {\n    \"sec-ch-ua\": '\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"',\n    \"sec-ch-ua-mobile\": \"?0\",\n    \"sec-ch-ua-platform\": '\"Windows\"',\n    \"sec-fetch-dest\": \"document\",\n    \"sec-fetch-mode\": \"navigate\",\n    \"sec-fetch-site\": \"none\",\n    \"sec-fetch-user\": \"?1\",\n    \"upgrade-insecure-requests\": \"1\",",
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
+        "label": "headers",
+        "kind": 5,
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "headers = {\n    \"sec-ch-ua\": '\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"',\n    \"sec-ch-ua-mobile\": \"?0\",\n    \"sec-ch-ua-platform\": '\"Windows\"',\n    \"sec-fetch-dest\": \"document\",\n    \"sec-fetch-mode\": \"navigate\",\n    \"sec-fetch-site\": \"none\",\n    \"sec-fetch-user\": \"?1\",\n    \"upgrade-insecure-requests\": \"1\",\n    \"user-agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36\"",
+        "detail": "helper.get_data",
+        "documentation": {}
+    },
+    {
         "label": "clinic_cache",
         "kind": 5,
-        "importPath": "helper.get_chat_response",
-        "description": "helper.get_chat_response",
-        "peekOfCode": "clinic_cache = {}\nCACHE_EXPIRY_TIME = 3000  \nasync def get_clinics_by_client(user_id: int):\n    current_time = time.time()\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data\n        else:",
-        "detail": "helper.get_chat_response",
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "clinic_cache = {}\nCACHE_EXPIRY_TIME = 3000  \nasync def get_client_data(user_id: int):\n    current_time = time.time()\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data\n        else:",
+        "detail": "helper.get_data",
         "documentation": {}
     },
     {
         "label": "CACHE_EXPIRY_TIME",
         "kind": 5,
-        "importPath": "helper.get_chat_response",
-        "description": "helper.get_chat_response",
-        "peekOfCode": "CACHE_EXPIRY_TIME = 3000  \nasync def get_clinics_by_client(user_id: int):\n    current_time = time.time()\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data\n        else:\n            print(f\"Cache expired for user {user_id}, removing from cache\")",
-        "detail": "helper.get_chat_response",
+        "importPath": "helper.get_data",
+        "description": "helper.get_data",
+        "peekOfCode": "CACHE_EXPIRY_TIME = 3000  \nasync def get_client_data(user_id: int):\n    current_time = time.time()\n    if user_id in clinic_cache:\n        cached_data, cached_time = clinic_cache[user_id]\n        if current_time - cached_time < CACHE_EXPIRY_TIME:\n            print(f\"Using cached data for user {user_id}\")\n            return cached_data\n        else:\n            print(f\"Cache expired for user {user_id}, removing from cache\")",
+        "detail": "helper.get_data",
         "documentation": {}
     },
     {

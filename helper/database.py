@@ -22,6 +22,7 @@ class Database:
         self.db = os.getenv('DB_NAME')
         self.processor = CallProcessor()
         self.scoring_service = LeadScoringService()
+        self.re_scoring_service = LeadScoringService()
 
 
     async def connect(self):

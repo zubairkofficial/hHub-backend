@@ -13,7 +13,7 @@ class LeadAnalysis(BaseModel):
     urgency_score: float = Field(description="Score for urgency level (0-100)")
     overall_score: float = Field(description="Combined score (0-100)")
     analysis_summary: str = Field(description="Comprehensive analysis incorporating all provided data")
-
+    
 class LeadScoringService:
     def __init__(self):
         self.llm = ChatOpenAI(
@@ -28,6 +28,13 @@ class LeadScoringService:
         self.score_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert lead scoring analyst. Given the following analysis summary, provide scores for the following aspects (0-100):\n1. Customer Intent\n2. Urgency\n3. Overall\nAlso, briefly justify each score.\n\n{format_instructions}"""),
             ("user", "Analysis Summary:\n{analysis_summary}")
+        ])
+        self.re_score_prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert lead scoring analyst. You have previously provided scores for this analysis, but the user has asked for a re-score. Please reconsider the information carefully and provide updated scores for the following aspects (0-100):\n1. Customer Intent  \n2. Urgency \n3. Overall \nAlso, briefly justify each score based on the analysis.\n\n{format_instructions}"""),
+            (
+                "user", 
+                "Analysis Summary:\n{analysis_summary}"
+            )
         ])
 
     async def generate_summary(self, transcription: str, client_type: Optional[str] = None, service: Optional[str] = None, state: Optional[str] = None, city: Optional[str] = None, first_call: Optional[bool] = None, rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None) -> dict:
@@ -46,6 +53,15 @@ class LeadScoringService:
 
     async def score_summary(self, analysis_summary: str) -> LeadAnalysis:
         formatted_prompt = self.score_prompt.format_messages(
+            analysis_summary=analysis_summary,
+            format_instructions=self.parser.get_format_instructions()
+        )
+        response = await self.llm.ainvoke(formatted_prompt)
+        analysis = self.parser.parse(response.content)
+        return analysis
+      
+    async def re_score_summary(self, analysis_summary: str) -> LeadAnalysis:
+        formatted_prompt = self.re_score_prompt.format_messages(
             analysis_summary=analysis_summary,
             format_instructions=self.parser.get_format_instructions()
         )

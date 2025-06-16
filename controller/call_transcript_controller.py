@@ -141,7 +141,6 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     
                     # Check if lead score already exists for this phone number
                     existing_lead_score = await LeadScore.filter(phone=phone_number).first()
-                    existing_lead_score = await LeadScore.filter(phone=phone_number).first()
 
                     # Check if a record is found
                     if existing_lead_score:
@@ -170,7 +169,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     analysis_summary = summary_response['summary']
                     
                     # Get scores for the analysis
-                    scores = await db.scoring_service.score_summary(analysis_summary)
+                    scores = await db.scoring_service.re_score_summary(analysis_summary)
                     print(f"score of this lead {scores}")
                     # Update or create lead score record
                     print("update or create ")
@@ -513,18 +512,58 @@ async def get_client_phone_score(
             "message": str(e),
             "data": []
         }
+
+
+@router.post("/rescore/{leadId}")
+async def re_score_lead(leadId: str):
+    try:
+        print(f"Fetching lead with ID: {leadId}")
+        lead_score = await LeadScore.filter(id=leadId).first()
         
+        if not lead_score:
+            print(f"Lead score not found for ID: {leadId}")
+            raise HTTPException(status_code=404, detail="Lead score not found")
         
-           
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
+        print(f"Generating new summary for lead ID: {leadId}")
+        summary_response = await db.scoring_service.generate_summary(
+            transcription=lead_score.analysis_summary,
+            previous_analysis=lead_score.analysis_summary
+        )
+
+        print(f"Generated summary: {summary_response}")
+        new_analysis_summary = summary_response['summary']
+
+        print(f"Getting new scores for lead ID: {leadId}")
+        updated_scores = await db.scoring_service.re_score_summary(new_analysis_summary)
+
+        print(f"Updated scores: {updated_scores}")
+        if not updated_scores:
+            print(f"No scores returned for lead ID: {leadId}")
+            raise HTTPException(status_code=500, detail="Failed to generate scores")
+
+        print(f"Updating lead score record for ID: {leadId}")
+        await LeadScore.filter(id=leadId).update(
+            analysis_summary=new_analysis_summary,
+            intent_score=updated_scores['intent_score'],
+            urgency_score=updated_scores['urgency_score'],
+            overall_score=updated_scores['overall_score'],
+            updated_at=datetime.now()
+        )
+        print(f"Lead score updated successfully for ID: {leadId}")
+
+        return {
+            "status": "success",
+            "message": f"Lead ID {leadId} rescored successfully.",
+            "data": {
+                "id": leadId,
+                "analysis_summary": new_analysis_summary,
+                "intent_score": updated_scores['intent_score'],
+                "urgency_score": updated_scores['urgency_score'],
+                "overall_score": updated_scores['overall_score']
+            }
+        }
+
+    except Exception as e:
+        print(f"Error rescoring lead {leadId}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to rescore lead: {str(e)}")

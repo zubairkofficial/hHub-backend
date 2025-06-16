@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
-
+from fastapi import BackgroundTasks
 load_dotenv()
 
 router= APIRouter()
@@ -116,11 +116,11 @@ async def get_chat_messages(chat_id: int, user_id: str):
 
 
 @router.post("/messages", response_model=MessageResponse)
-async def send_message(message_data: MessageCreate):
+async def send_message(message_data: MessageCreate,background_tasks: BackgroundTasks):
     """Send a message and get AI response"""
     try:
         # Generate AI response (replace with your AI service)
-        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id)
+        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id,background_tasks)
         
         # Save message to database
         message = await Message.create(
@@ -182,6 +182,20 @@ async def delete_chat(chat_id: int):
     except Exception as e:  
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
 
+@router.delete("/message/{message_id}")
+async def delete_message(message_id: int):
+    """Delete a messages."""
+    try:
+       
+        message = await Message.get(id=message_id)
+        if message:
+            await message.delete()
+            return {"message": "Message deleted successfully."}
+        else:
+            raise HTTPException(status_code=404, detail="Message not found")
+
+    except Exception as e:  
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
 
 
 
