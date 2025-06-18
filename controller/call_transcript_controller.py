@@ -18,6 +18,7 @@ import uuid
 from collections import defaultdict
 from dotenv import load_dotenv
 from datetime import datetime
+from models.system_prompt import SystemPrompts
 
 load_dotenv()
 
@@ -545,9 +546,9 @@ async def re_score_lead(leadId: str):
         print(f"Updating lead score record for ID: {leadId}")
         await LeadScore.filter(id=leadId).update(
             analysis_summary=new_analysis_summary,
-            intent_score=updated_scores['intent_score'],
-            urgency_score=updated_scores['urgency_score'],
-            overall_score=updated_scores['overall_score'],
+            intent_score=updated_scores.intent_score,
+            urgency_score=updated_scores.urgency_score,
+            overall_score=updated_scores.overall_score,
             updated_at=datetime.now()
         )
         print(f"Lead score updated successfully for ID: {leadId}")
@@ -558,12 +559,50 @@ async def re_score_lead(leadId: str):
             "data": {
                 "id": leadId,
                 "analysis_summary": new_analysis_summary,
-                "intent_score": updated_scores['intent_score'],
-                "urgency_score": updated_scores['urgency_score'],
-                "overall_score": updated_scores['overall_score']
+                "intent_score": updated_scores.intent_score,
+                "urgency_score": updated_scores.urgency_score,
+                "overall_score": updated_scores.overall_score
             }
         }
 
     except Exception as e:
         print(f"Error rescoring lead {leadId}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to rescore lead: {str(e)}")
+
+class SystemPrompt(BaseModel):
+     system_prompt:str
+     analytics_prompt:str
+     summery_score:str
+    
+    
+@router.post("/prompt")
+async def system_prompt(prompt: SystemPrompt):
+    try:
+        obj = await SystemPrompts.filter().first()
+
+        if obj:
+            await obj.update_from_dict(prompt.dict(exclude_unset=True))
+            await obj.save()
+            return {"message": "Prompt updated successfully", "id": obj.id}
+        else:
+            obj = await SystemPrompts.create(**prompt.dict())
+            return {"message": "Prompt created successfully", "id": obj.id}
+
+    except Exception as e:
+        print(f"Error while saving prompts: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error while saving {str(e)}")
+    
+    
+@router.get("/prompt")
+async def system_prompt():
+    try:
+        system_prompt = await SystemPrompts.all().first()
+        
+        if system_prompt:
+            return {"success": True, "message": "Prompt fetched successfully", "prompt": system_prompt}
+        else:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+
+    except Exception as e:
+        print(f"Error while fetching prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error while fetching prompt")

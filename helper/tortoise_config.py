@@ -17,7 +17,8 @@ TORTOISE_CONFIG = {
                 'models.followup_prediction',
                 'models.chat_history',
                 'models.chat',
-                'models.message'
+                'models.message',
+                'models.system_prompt'
             ],
             'default_connection': 'default'
         },

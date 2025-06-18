@@ -744,6 +744,14 @@
         "documentation": {}
     },
     {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "re",
         "kind": 6,
         "isExtraImport": true,
@@ -909,6 +917,30 @@
         "description": "dotenv",
         "isExtraImport": true,
         "detail": "dotenv",
+        "documentation": {}
+    },
+    {
+        "label": "SystemPrompts",
+        "importPath": "models.system_prompt",
+        "description": "models.system_prompt",
+        "isExtraImport": true,
+        "detail": "models.system_prompt",
+        "documentation": {}
+    },
+    {
+        "label": "SystemPrompts",
+        "importPath": "models.system_prompt",
+        "description": "models.system_prompt",
+        "isExtraImport": true,
+        "detail": "models.system_prompt",
+        "documentation": {}
+    },
+    {
+        "label": "SystemPrompts",
+        "importPath": "models.system_prompt",
+        "description": "models.system_prompt",
+        "isExtraImport": true,
+        "detail": "models.system_prompt",
         "documentation": {}
     },
     {
@@ -1367,6 +1399,14 @@
         "documentation": {}
     },
     {
+        "label": "BaseDBAsyncClient",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
         "label": "fields",
         "importPath": "tortoise",
         "description": "tortoise",
@@ -1468,6 +1508,22 @@
         "description": "tortoise",
         "isExtraImport": true,
         "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "fields",
+        "importPath": "tortoise",
+        "description": "tortoise",
+        "isExtraImport": true,
+        "detail": "tortoise",
+        "documentation": {}
+    },
+    {
+        "label": "Model",
+        "importPath": "tortoise.models",
+        "description": "tortoise.models",
+        "isExtraImport": true,
+        "detail": "tortoise.models",
         "documentation": {}
     },
     {
@@ -1615,6 +1671,15 @@
         "description": "controller.call_controller",
         "peekOfCode": "db = Database()\nclass CallRecordingRequest(BaseModel):\n    audio_url: str\n    call_id: Optional[str] = None\nclass CallRecordingResponse(BaseModel):\n    status: str\n    transcription: Optional[str] = None\n    language: Optional[str] = None\n    error: Optional[str] = None\n    processed_at: Optional[str] = None",
         "detail": "controller.call_controller",
+        "documentation": {}
+    },
+    {
+        "label": "SystemPrompt",
+        "kind": 6,
+        "importPath": "controller.call_transcript_controller",
+        "description": "controller.call_transcript_controller",
+        "peekOfCode": "class SystemPrompt(BaseModel):\n     system_prompt:str\n     analytics_prompt:str\n     summery_score:str\n@router.post(\"/prompt\")\nasync def system_prompt(prompt: SystemPrompt):\n    try:\n        obj = await SystemPrompts.filter().first()\n        if obj:\n            await obj.update_from_dict(prompt.dict(exclude_unset=True))",
+        "detail": "controller.call_transcript_controller",
         "documentation": {}
     },
     {
@@ -1847,7 +1912,7 @@
         "kind": 5,
         "importPath": "helper.get_chat_response",
         "description": "helper.get_chat_response",
-        "peekOfCode": "prompt = ChatPromptTemplate.from_messages([\n    ('system', 'You are an assistant of \"Houmanity\" project. Use this data to answer: {data}'),\n    MessagesPlaceholder(\"history\"),\n    (\"user\", \"{prompt}\")\n])\nmodel = init_chat_model(\"gpt-4o-mini\", model_provider=\"openai\")\noutput_parser = StrOutputParser()\nchain = prompt | model | output_parser\nasync def get_chat_history(chat_id: int) -> list:\n    try:",
+        "peekOfCode": "prompt = ChatPromptTemplate.from_messages([\n    ('system', '{systemprompt}. Use this data to answer: {data}'),\n    MessagesPlaceholder(\"history\"),\n    (\"user\", \"{prompt}\")\n])\nmodel = init_chat_model(\"gpt-4o-mini\", model_provider=\"openai\")\noutput_parser = StrOutputParser()\nchain = prompt | model | output_parser\nasync def get_chat_history(chat_id: int) -> list:\n    try:",
         "detail": "helper.get_chat_response",
         "documentation": {}
     },
@@ -1928,7 +1993,7 @@
         "kind": 6,
         "importPath": "helper.lead_scoring",
         "description": "helper.lead_scoring",
-        "peekOfCode": "class LeadScoringService:\n    def __init__(self):\n        self.llm = ChatOpenAI(\n            model=\"gpt-4o-mini\",\n            temperature=0,\n            api_key=os.getenv(\"OPENAI_API_KEY\")\n        )\n        self.parser = PydanticOutputParser(pydantic_object=LeadAnalysis)\n        self.summary_prompt = ChatPromptTemplate.from_messages([\n            (\"system\", \"\"\"You are an expert call analyst. Given the following call transcriptions, previous analysis (if any), and client context, write a comprehensive analysis summary that incorporates both historical and new information.\\n\\nContext:\\n- Client Type: {client_type}\\n- Service: {service}\\n- Location: {state}, {city}\\n- First Call: {first_call}\\n- Rota Plan: {rota_plan}\\n\\nPrevious Analysis (if any):\\n{previous_analysis}\\n\\nNew Call Transcriptions:\\n{transcription}\\n\\nWrite a single, comprehensive analysis summary that incorporates all the provided data, including both historical context from previous analysis and new information from recent calls. Explain how each factor influences the lead's potential and highlight any changes or developments in the client's situation.\"\"\"),",
+        "peekOfCode": "class LeadScoringService:\n    def __init__(self):\n        self.llm = ChatOpenAI(\n            model=\"gpt-4o-mini\",\n            temperature=0,\n            api_key=os.getenv(\"OPENAI_API_KEY\")\n        )\n        self.parser = PydanticOutputParser(pydantic_object=LeadAnalysis)\n        self.default_analytics_prompt = \"\"\"You are an expert call analyst. Given the following call transcriptions, previous analysis (if any), and client context, write a comprehensive analysis summary that incorporates both historical and new information.\\n\\nContext:\\n- Client Type: {client_type}\\n- Service:{service}\\n- Location: {state}, {city}\\n- First Call: {first_call}\\n- Rota Plan: {rota_plan}\\n\\nPrevious Analysis (if any):\\n{previous_analysis}\\n\\nNew Call Transcriptions:\\n\\n\\nWrite a single, comprehensive analysis summary that incorporates all the provided data, including both historical context from previous analysis and new information from recent calls. Explain how each factor influences the lead's potential and highlight any changes or developments in the client's situation.\"\"\"\n        self.default_score_prompt = \"\"\"You are an expert lead scoring analyst. Given the following analysis summary, provide scores for the following aspects (0-100):\\n1. Customer Intent\\n2. Urgency\\n3. Overall\\nAlso, briefly justify each score.\\n\\n{format_instructions}\"\"\"",
         "detail": "helper.lead_scoring",
         "documentation": {}
     },
@@ -1993,6 +2058,15 @@
         "description": "models.model",
         "peekOfCode": "class Lead_Ranks(Model):\n    id = fields.IntField(pk=True)\n    name = fields.CharField(max_length=255)\n    description = fields.TextField()\n    created_at = fields.DatetimeField(auto_now_add=True)\n    updated_at = fields.DatetimeField(auto_now=True)",
         "detail": "models.model",
+        "documentation": {}
+    },
+    {
+        "label": "SystemPrompts",
+        "kind": 6,
+        "importPath": "models.system_prompt",
+        "description": "models.system_prompt",
+        "peekOfCode": "class SystemPrompts(Model):\n    id = fields.IntField(pk=True)\n    system_prompt = fields.TextField()\n    analytics_prompt = fields.TextField()\n    summery_score = fields.TextField()\n    created_at = fields.DatetimeField(auto_now_add=True)\n    updated_at = fields.DatetimeField(auto_now=True)\n    class Meta:\n        table = \"system_prompts\"",
+        "detail": "models.system_prompt",
         "documentation": {}
     },
     {
