@@ -10,8 +10,7 @@ from controller.call_transcript_controller import router as transcript_router
 
 app = FastAPI(lifespan=lifespan)
 
-# Include the routers
-app.include_router(lead_router, prefix="/api/v1", tags=["lead-scoring"])
+
 
 app.include_router(follow_router, prefix="/api/v1", tags=["followup-prediction"])
 
