@@ -6,19 +6,26 @@ from helper.lead_scoring import LeadScoringService
 from models.lead_score import LeadScore
 from tortoise import Tortoise
 from helper.tortoise_config import TORTOISE_CONFIG
+import httpx
+import os
 
 # Initialize helpers
 db = Database()
 processor = CallProcessor()
 scoring_service = LeadScoringService()
+API_URL = os.getenv("API_URL")
 
 async def process_unprocessed_callrails():
     # Initialize Tortoise ORM
     await Tortoise.init(config=TORTOISE_CONFIG)
     await Tortoise.generate_schemas()
     try:
-        # 1. Get all unprocessed callrails rows
-        rows = await db.fetch("SELECT * FROM callrails WHERE is_processed = FALSE")
+        # 1. Fetch all call data from the API
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{API_URL}/api/transcript")
+            call_data = response.json()
+            rows = [row for row in call_data.get("data", []) if not row.get("is_processed")]
+
         if not rows:
             print(f"[{datetime.now()}] No unprocessed callrails found.")
             return
@@ -95,12 +102,15 @@ async def process_unprocessed_callrails():
                     updated_at=datetime.now()
                 )
                 print(f"[{datetime.now()}] Created new lead score for {phone_number}")
-            # 6. Mark all these calls as processed
+            # 6. Mark all these calls as processed via Laravel API
             call_ids = [call["id"] for call in calls]
-            await db.execute(
-                f"UPDATE callrails SET is_processed = TRUE WHERE id IN ({','.join(['%s']*len(call_ids))})",
-                tuple(call_ids)
-            )
-            print(f"[{datetime.now()}] Marked calls as processed for phone number: {phone_number}")
+            for call_id in call_ids:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    update_url = f"{API_URL}/api/update_call/{call_id}"
+                    response = await client.get(update_url)
+                    if response.status_code == 200:
+                        print(f"[{datetime.now()}] Marked call {call_id} as processed via API.")
+                    else:
+                        print(f"[{datetime.now()}] Failed to mark call {call_id} as processed via API. Status: {response.status_code}")
     finally:
         await Tortoise.close_connections() 
