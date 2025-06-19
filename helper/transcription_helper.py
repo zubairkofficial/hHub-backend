@@ -35,7 +35,7 @@ async def process_unprocessed_callrails():
         # 1. Fetch all call data from the API
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                response = await client.get(f"{API_URL}/api/transcript",headers=headers)
+                response = await client.get(f"{API_URL}/api/transcript", headers=headers)
                 response.raise_for_status()
                 call_data = response.json()
             except httpx.HTTPStatusError as e:
@@ -123,7 +123,6 @@ async def process_unprocessed_callrails():
                     updated_at=datetime.now()
                 )
                 print(f"[{datetime.now()}] Created new lead score for {phone_number}")
-
             # 6. Mark all these calls as processed via Laravel API
             update_tasks = []
             for call in calls:
@@ -138,7 +137,7 @@ async def process_unprocessed_callrails():
 async def mark_call_as_processed(update_url):
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            response = await client.get(update_url)
+            response = await client.get(update_url, headers=headers)
             response.raise_for_status()
             if response.status_code == 200:
                 print(f"Marked call as processed: {update_url}")
