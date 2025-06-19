@@ -22,8 +22,17 @@ async def process_unprocessed_callrails():
     try:
         # 1. Fetch all call data from the API
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{API_URL}/api/transcript")
-            call_data = response.json()
+            try:
+                response = await client.get(f"{API_URL}/api/transcript")
+                response.raise_for_status()
+                call_data = response.json()
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP error occurred: {e}")
+                return
+            except Exception as e:
+                print(f"Error fetching call data: {e}")
+                return
+            
             rows = [row for row in call_data.get("data", []) if not row.get("is_processed")]
 
         if not rows:
@@ -102,15 +111,28 @@ async def process_unprocessed_callrails():
                     updated_at=datetime.now()
                 )
                 print(f"[{datetime.now()}] Created new lead score for {phone_number}")
+
             # 6. Mark all these calls as processed via Laravel API
-            call_ids = [call["id"] for call in calls]
-            for call_id in call_ids:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    update_url = f"{API_URL}/api/update_call/{call_id}"
-                    response = await client.get(update_url)
-                    if response.status_code == 200:
-                        print(f"[{datetime.now()}] Marked call {call_id} as processed via API.")
-                    else:
-                        print(f"[{datetime.now()}] Failed to mark call {call_id} as processed via API. Status: {response.status_code}")
+            update_tasks = []
+            for call in calls:
+                update_url = f"{API_URL}/api/update_call/{call['id']}"
+                update_tasks.append(mark_call_as_processed(update_url))
+
+            await asyncio.gather(*update_tasks)
+
     finally:
-        await Tortoise.close_connections() 
+        await Tortoise.close_connections()
+
+async def mark_call_as_processed(update_url):
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(update_url)
+            response.raise_for_status()
+            if response.status_code == 200:
+                print(f"Marked call as processed: {update_url}")
+            else:
+                print(f"Unexpected status for {update_url}: {response.status_code}")
+        except httpx.HTTPStatusError as e:
+            print(f"Failed to mark call: {update_url}, error: {e}")
+        except Exception as e:
+            print(f"Error in marking call: {update_url}, error: {e}")
