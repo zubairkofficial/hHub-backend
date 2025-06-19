@@ -15,6 +15,18 @@ processor = CallProcessor()
 scoring_service = LeadScoringService()
 API_URL = os.getenv("API_URL")
 
+headers = {
+    "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+}
+
 async def process_unprocessed_callrails():
     # Initialize Tortoise ORM
     await Tortoise.init(config=TORTOISE_CONFIG)
@@ -23,7 +35,7 @@ async def process_unprocessed_callrails():
         # 1. Fetch all call data from the API
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
-                response = await client.get(f"{API_URL}/api/transcript")
+                response = await client.get(f"{API_URL}/api/transcript",headers=headers)
                 response.raise_for_status()
                 call_data = response.json()
             except httpx.HTTPStatusError as e:
