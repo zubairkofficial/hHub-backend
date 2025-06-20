@@ -1,6 +1,5 @@
 import asyncio
-from helper.transcription_helper import process_unprocessed_callrails
+from helper.job_helper import run_job  # Ensure this imports correctly from your module
 
 if __name__ == "__main__":
-    asyncio.run(process_unprocessed_callrails())
-    
+    asyncio.run(run_job())  # Running the async job

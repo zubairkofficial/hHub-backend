@@ -573,6 +573,7 @@ class SystemPrompt(BaseModel):
      system_prompt:str
      analytics_prompt:str
      summery_score:str
+     hour:str
     
     
 @router.post("/prompt")

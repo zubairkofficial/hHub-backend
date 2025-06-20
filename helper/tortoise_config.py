@@ -1,6 +1,7 @@
 from tortoise import Tortoise
 import os
 import dotenv
+from models.job_tracker import JobTracker
 
 dotenv.load_dotenv()
 
@@ -18,7 +19,8 @@ TORTOISE_CONFIG = {
                 'models.chat_history',
                 'models.chat',
                 'models.message',
-                'models.system_prompt'
+                'models.system_prompt',
+                'models.job_tracker'
             ],
             'default_connection': 'default'
         },
@@ -27,6 +29,7 @@ TORTOISE_CONFIG = {
 
 async def lifespan(_):
     await Tortoise.init(config=TORTOISE_CONFIG)
+    await Tortoise.generate_schemas()
     print("Initializing LifeSpan")
     yield
 

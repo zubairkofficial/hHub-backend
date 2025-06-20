@@ -13,7 +13,6 @@ app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(follow_router, prefix="/api/v1", tags=["followup-prediction"])
-
 app.include_router(chat_routre, prefix="/api", tags=["chat"])
 app.include_router(transcript_router, prefix="/api", tags=["transcript"])
 
