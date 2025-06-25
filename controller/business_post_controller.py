@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Path
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 from helper.business_post_helper import BusinessPostHelper
 from models.post_settings import PostSettings
@@ -9,6 +9,7 @@ from datetime import datetime
 router = APIRouter()
 
 class PostSettingsRequest(BaseModel):
+    user_id: int
     business_idea: str
     brand_guidelines: str = None
     frequency: str = 'daily'
@@ -16,6 +17,7 @@ class PostSettingsRequest(BaseModel):
 
 class PostSettingsResponse(BaseModel):
     id: int
+    user_id: int
     business_idea: str
     brand_guidelines: str = None
     frequency: str
@@ -35,7 +37,7 @@ helper = BusinessPostHelper()
 @router.post("/post-settings", response_model=PostSettingsResponse)
 async def upsert_post_settings(request: PostSettingsRequest):
     try:
-        existing = await PostSettings.filter().first()
+        existing = await PostSettings.filter(user_id=request.user_id).first()
         if existing:
             existing.business_idea = request.business_idea
             existing.brand_guidelines = request.brand_guidelines
@@ -45,6 +47,7 @@ async def upsert_post_settings(request: PostSettingsRequest):
             settings = existing
         else:
             settings = await PostSettings.create(
+                user_id=request.user_id,
                 business_idea=request.business_idea,
                 brand_guidelines=request.brand_guidelines,
                 frequency=request.frequency,
@@ -52,6 +55,7 @@ async def upsert_post_settings(request: PostSettingsRequest):
             )
         return PostSettingsResponse(
             id=settings.id,
+            user_id=settings.user_id,
             business_idea=settings.business_idea,
             brand_guidelines=settings.brand_guidelines,
             frequency=settings.frequency,
@@ -67,6 +71,7 @@ async def get_all_post_settings():
         return [
             PostSettingsResponse(
                 id=s.id,
+                user_id=s.user_id,
                 business_idea=s.business_idea,
                 brand_guidelines=s.brand_guidelines,
                 frequency=s.frequency,
@@ -82,6 +87,7 @@ async def get_post_settings(settings_id: int):
         settings = await PostSettings.get(id=settings_id)
         return PostSettingsResponse(
             id=settings.id,
+            user_id=settings.user_id,
             business_idea=settings.business_idea,
             brand_guidelines=settings.brand_guidelines,
             frequency=settings.frequency,
@@ -91,9 +97,12 @@ async def get_post_settings(settings_id: int):
         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
 
 @router.get("/posts", response_model=List[BusinessPostResponse])
-async def get_all_posts():
+async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
     try:
-        posts = await BusinessPost.all().order_by('-created_at')
+        if user_id is not None:
+            posts = await BusinessPost.filter(user_id=user_id).order_by('-created_at')
+        else:
+            posts = await BusinessPost.all().order_by('-created_at')
         return [
             BusinessPostResponse(
                 id=post.id,

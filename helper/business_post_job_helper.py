@@ -10,38 +10,39 @@ async def run_business_post_job():
     await Tortoise.generate_schemas()
     try:
         current_time = datetime.now()
-        settings = await PostSettings.filter().first()
-        if not settings:
-            print("No post settings found.")
-            return
+        all_settings = await PostSettings.all()
         helper = BusinessPostHelper()
-        freq = (settings.frequency or 'daily').lower()
-        num_posts = settings.posts_per_period or 1
+        for settings in all_settings:
+            user_id = settings.user_id
+            freq = (settings.frequency or 'daily').lower()
+            num_posts = settings.posts_per_period or 1
 
-        # Determine period start for uniqueness
-        if freq == 'daily':
-            period_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif freq == 'weekly':
-            period_start = current_time - timedelta(days=current_time.weekday())
-            period_start = period_start.replace(hour=0, minute=0, second=0, microsecond=0)
-        else:
-            period_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            # Determine period start for uniqueness
+            if freq == 'daily':
+                period_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif freq == 'weekly':
+                period_start = current_time - timedelta(days=current_time.weekday())
+                period_start = period_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                period_start = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        # Count all posts created in this period (regardless of status)
-        already_created = await BusinessPost.filter(
-            created_at__gte=period_start
-        ).count()
+            # Count all posts for this user in this period
+            already_created = await BusinessPost.filter(
+                user_id=user_id,
+                created_at__gte=period_start
+            ).count()
 
-        if already_created >= num_posts:
-            print(f"[Post Generation] {num_posts} posts already created for this period. No new posts generated.")
-        else:
-            for i in range(num_posts - already_created):
-                post_text = await helper.generate_post(settings.business_idea, settings.brand_guidelines)
-                await BusinessPost.create(
-                    post=post_text,
-                    status='created'
-                )
-                print(f"[Post Generation] Created new post for period starting {period_start}.")
+            if already_created >= num_posts:
+                print(f"[Post Generation] {num_posts} posts already created for user {user_id} for this period. No new posts generated.")
+            else:
+                for i in range(num_posts - already_created):
+                    post_text = await helper.generate_post(settings.business_idea, settings.brand_guidelines)
+                    await BusinessPost.create(
+                        user_id=user_id,
+                        post=post_text,
+                        status='created'
+                    )
+                    print(f"[Post Generation] Created new post for user {user_id} for period starting {period_start}.")
     finally:
         await Tortoise.close_connections()
 

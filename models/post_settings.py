@@ -2,6 +2,7 @@ from tortoise import fields, models
 
 class PostSettings(models.Model):
     id = fields.IntField(pk=True)
+    user_id = fields.CharField(max_length=100)
     business_idea = fields.TextField()
     brand_guidelines = fields.TextField(null=True)
     frequency = fields.CharField(max_length=32, default='daily')
