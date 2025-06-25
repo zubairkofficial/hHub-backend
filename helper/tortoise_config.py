@@ -1,7 +1,6 @@
 from tortoise import Tortoise
 import os
 import dotenv
-from models.job_tracker import JobTracker
 
 dotenv.load_dotenv()
 
@@ -20,7 +19,9 @@ TORTOISE_CONFIG = {
                 'models.chat',
                 'models.message',
                 'models.system_prompt',
-                'models.job_tracker'
+                'models.job_tracker',
+                'models.business_post',
+                'models.post_settings'
             ],
             'default_connection': 'default'
         },

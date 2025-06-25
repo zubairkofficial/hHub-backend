@@ -5,7 +5,6 @@ from langchain_core.messages import HumanMessage, AIMessage
 from models.message import Message
 import os
 from dotenv import load_dotenv
-from dotenv import load_dotenv
 from controller.call_transcript_controller import headers
 from helper.get_data import get_client_data
 import json
