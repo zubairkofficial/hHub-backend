@@ -64,37 +64,37 @@ async def upsert_post_settings(request: PostSettingsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error upserting post settings: {str(e)}")
 
-@router.get("/post-settings", response_model=List[PostSettingsResponse])
-async def get_all_post_settings():
-    try:
-        settings = await PostSettings.all()
-        return [
-            PostSettingsResponse(
-                id=s.id,
-                user_id=s.user_id,
-                business_idea=s.business_idea,
-                brand_guidelines=s.brand_guidelines,
-                frequency=s.frequency,
-                posts_per_period=s.posts_per_period
-            ) for s in settings
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
+# @router.get("/post-settings", response_model=List[PostSettingsResponse])
+# async def get_all_post_settings():
+#     try:
+#         settings = await PostSettings.all()
+#         return [
+#             PostSettingsResponse(
+#                 id=s.id,
+#                 user_id=s.user_id,
+#                 business_idea=s.business_idea,
+#                 brand_guidelines=s.brand_guidelines,
+#                 frequency=s.frequency,
+#                 posts_per_period=s.posts_per_period
+#             ) for s in settings
+#         ]
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
 
-@router.get("/post-settings/{settings_id}", response_model=PostSettingsResponse)
-async def get_post_settings(settings_id: int):
-    try:
-        settings = await PostSettings.get(id=settings_id)
-        return PostSettingsResponse(
-            id=settings.id,
-            user_id=settings.user_id,
-            business_idea=settings.business_idea,
-            brand_guidelines=settings.brand_guidelines,
-            frequency=settings.frequency,
-            posts_per_period=settings.posts_per_period
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
+# @router.get("/post-settings/{settings_id}", response_model=PostSettingsResponse)
+# async def get_post_settings(settings_id: int):
+#     try:
+#         settings = await PostSettings.get(id=settings_id)
+#         return PostSettingsResponse(
+#             id=settings.id,
+#             user_id=settings.user_id,
+#             business_idea=settings.business_idea,
+#             brand_guidelines=settings.brand_guidelines,
+#             frequency=settings.frequency,
+#             posts_per_period=settings.posts_per_period
+#         )
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
 
 @router.get("/posts", response_model=List[BusinessPostResponse])
 async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
