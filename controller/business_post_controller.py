@@ -117,4 +117,19 @@ async def approve_post(post_id: int = Path(..., description="ID of the post to a
         return {"message": "Post approved and status updated to 'posted'", "id": post.id, "status": post.status, "post_url": post_url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error approving post: {str(e)}")
+    
+@router.get("/posts/{post_id}", response_model=BusinessPostResponse)
+async def get_post_by_id(post_id: int = Path(..., description="ID of the post to fetch")):
+    try:
+        post = await BusinessPost.get(id=post_id)
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        return BusinessPostResponse(
+            id=post.id,
+            post=post.post,
+            status=post.status,
+            created_at=post.created_at.isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
 
