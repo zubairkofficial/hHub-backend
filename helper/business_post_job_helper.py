@@ -36,11 +36,24 @@ async def run_business_post_job():
                 print(f"[Post Generation] {num_posts} posts already created for user {user_id} for this period. No new posts generated.")
             else:
                 for i in range(num_posts - already_created):
+                    # Generate post text
                     post_text = await helper.generate_post(settings.business_idea, settings.brand_guidelines)
+                    
+                    # Generate image if brand guidelines are provided
+                    image_url = None
+                    if settings.brand_guidelines:
+                        try:
+                            image_url = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
+                            print(f"[Image Generation] Generated image for user {user_id}")
+                        except Exception as e:
+                            print(f"[Image Generation] Error generating image for user {user_id}: {str(e)}")
+                    
+                    # Create the post with image if available
                     await BusinessPost.create(
                         user_id=user_id,
                         post=post_text,
-                        status='created'
+                        status='created',
+                        image_url=image_url
                     )
                     print(f"[Post Generation] Created new post for user {user_id} for period starting {period_start}.")
     finally:

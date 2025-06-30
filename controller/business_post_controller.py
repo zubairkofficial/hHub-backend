@@ -31,6 +31,7 @@ class PostSettingsResponse(BaseModel):
     brand_guidelines: str = None
     frequency: str
     posts_per_period: int
+    preview_image_url: Optional[str] = None
 
 
 class ApprovePostRequest(BaseModel):
@@ -74,13 +75,24 @@ async def get_post_settings(user_id: int = Query(...)):
         settings = await PostSettings.filter(user_id=user_id).first()
         if not settings:
             raise HTTPException(status_code=404, detail="Settings not found")
+
+        # Generate a preview image if brand guidelines are provided
+        preview_image_url = None
+        if settings.brand_guidelines:
+            try:
+                preview_image_url = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
+                print(f"[Image Generation] Generated preview image for user {user_id}")
+            except Exception as e:
+                print(f"[Image Generation] Error generating preview image for user {user_id}: {str(e)}")
+
         return PostSettingsResponse(
             id=settings.id,
             user_id=settings.user_id,
             business_idea=settings.business_idea,
             brand_guidelines=settings.brand_guidelines,
             frequency=settings.frequency,
-            posts_per_period=settings.posts_per_period
+            posts_per_period=settings.posts_per_period,
+            preview_image_url=preview_image_url
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
@@ -98,7 +110,8 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 id=post.id,
                 post=post.post,
                 status=post.status,
-                created_at=post.created_at.isoformat()
+                created_at=post.created_at.isoformat(),
+                image_url=getattr(post, 'image_url', None)
             ) for post in posts
         ]
     except Exception as e:
@@ -133,7 +146,6 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
             post=post.post,
             status=post.status,
             created_at=post.created_at.isoformat(),
-            title=getattr(post, 'title', None),
             image_url=getattr(post, 'image_url', None)
         )
     except Exception as e:
