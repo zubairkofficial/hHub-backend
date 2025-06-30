@@ -4,9 +4,16 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from openai import OpenAI
 import json
+import requests
+from urllib.parse import unquote, urlparse
+import re
 
 
 load_dotenv()
+
+def sanitize_filename(filename):
+    # Replace forbidden characters with underscore
+    return re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
 
 class BusinessPostHelper:
     def __init__(self):
@@ -69,10 +76,28 @@ class BusinessPostHelper:
                 n=1
             )
 
-            # Check if response is valid and contains data
             if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
-                print(f"[Image Generation] Image URL: {response.data[0].url}")
-                return response.data[0].url
+                image_url = response.data[0].url
+                # Extract filename and extension
+                filename = image_url.split("/")[-1].split("?")[0]
+                decoded_filename = unquote(filename)
+                parsed = urlparse(image_url)
+                ext = os.path.splitext(parsed.path)[1]
+                if not ext:
+                    ext = ".jpg"
+                # If decoded_filename has no extension, add it
+                if not decoded_filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    decoded_filename += ext
+                # Sanitize the filename for Windows compatibility
+                decoded_filename = sanitize_filename(decoded_filename)
+                image_folder = "images"
+                os.makedirs(image_folder, exist_ok=True)
+                image_path = os.path.join(image_folder, decoded_filename)
+                img_data = requests.get(image_url).content
+                with open(image_path, "wb") as handler:
+                    handler.write(img_data)
+                print(f"[Image Generation] Image saved as {image_path}")
+                return decoded_filename
             else:
                 print(f"[Image Generation] No image URL returned. Response: {response}")
                 return None

@@ -40,20 +40,23 @@ async def run_business_post_job():
                     post_text = await helper.generate_post(settings.business_idea, settings.brand_guidelines)
                     
                     # Generate image if brand guidelines are provided
-                    image_url = None
+                    image_id = None
                     if settings.brand_guidelines:
                         try:
-                            image_url = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
-                            print(f"[Image Generation] Generated image for user {user_id}")
+                            image_id = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
+                            if image_id:
+                                print(f"[Image Generation] Generated image for user {user_id}")
+                            else:
+                                print(f"[Image Generation] No image generated for user {user_id}")
                         except Exception as e:
                             print(f"[Image Generation] Error generating image for user {user_id}: {str(e)}")
                     
-                    # Create the post with image if available
+                    # Create the post with image_id if available
                     await BusinessPost.create(
                         user_id=user_id,
                         post=post_text,
                         status='created',
-                        image_url=image_url
+                        image_id=image_id
                     )
                     print(f"[Post Generation] Created new post for user {user_id} for period starting {period_start}.")
     finally:
