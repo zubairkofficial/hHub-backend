@@ -106,8 +106,15 @@ async def approve_post(post_id: int = Path(..., description="ID of the post to a
         post = await BusinessPost.get(id=post_id)
         if not post:
             raise HTTPException(status_code=404, detail="Post not found")
+
+        # Update post status to 'posted'
         post.status = 'posted'
         await post.save()
-        return {"message": "Post approved and status updated to 'posted'", "id": post.id, "status": post.status}
+
+        # Generate the post URL for sharing
+        post_url = f"https://your-website-url.com/post/{post.id}"  # Post URL for sharing
+        
+        return {"message": "Post approved and status updated to 'posted'", "id": post.id, "status": post.status, "post_url": post_url}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error approving post: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error approving post: {str(e)}")
+
