@@ -15,6 +15,15 @@ class PostSettingsRequest(BaseModel):
     frequency: str = 'daily'
     posts_per_period: int = 1
 
+class BusinessPostResponse(BaseModel):
+    id: int
+    post: str
+    status: str
+    created_at: str
+    title: Optional[str] = None
+    image_url: Optional[str] = None
+
+
 class PostSettingsResponse(BaseModel):
     id: int
     user_id: int
@@ -23,11 +32,6 @@ class PostSettingsResponse(BaseModel):
     frequency: str
     posts_per_period: int
 
-class BusinessPostResponse(BaseModel):
-    id: int
-    post: str
-    status: str
-    created_at: str
 
 class ApprovePostRequest(BaseModel):
     post_id: int
@@ -128,7 +132,9 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
             id=post.id,
             post=post.post,
             status=post.status,
-            created_at=post.created_at.isoformat()
+            created_at=post.created_at.isoformat(),
+            title=getattr(post, 'title', None),
+            image_url=getattr(post, 'image_url', None)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
