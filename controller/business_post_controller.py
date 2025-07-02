@@ -119,15 +119,8 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching posts: {str(e)}")
 
-@staticmethod
 def display_image_helper(image_id):
-    image_id = unquote(image_id)
-    image_folder = os.path.join(os.getcwd(), 'images')
-    image_path = os.path.join(image_folder, image_id)
-    print(f"Looking for image at: {image_path}")
-    if os.path.exists(image_path):
-        return FileResponse(path=image_path, media_type='image/png')
-    # ... rest of logic ...
+    return BusinessPostHelper.display_image_helper(image_id)
 
 @router.get('/display-image/{image_id}')
 def display_image(image_id: str):

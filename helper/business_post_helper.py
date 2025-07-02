@@ -7,9 +7,14 @@ import json
 import requests
 from urllib.parse import unquote, urlparse
 import re
+from fastapi.responses import FileResponse
+from fastapi import HTTPException
 
 
 load_dotenv()
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMAGE_DIR = os.path.join(BASE_DIR, '..', 'images')
 
 def sanitize_filename(filename):
     # Replace forbidden characters with underscore
@@ -73,13 +78,28 @@ class BusinessPostHelper:
             if not decoded_filename.lower().endswith((".jpg", ".jpeg", ".png")):
                 decoded_filename += ext
             filename = sanitize_filename(decoded_filename)
-        image_folder = os.path.join(os.getcwd(), 'images')
-        os.makedirs(image_folder, exist_ok=True)
-        image_path = os.path.join(image_folder, filename)
+        os.makedirs(IMAGE_DIR, exist_ok=True)
+        image_path = os.path.join(IMAGE_DIR, filename)
         img_data = requests.get(image_url).content
         with open(image_path, "wb") as handler:
             handler.write(img_data)
         return filename
+
+    @staticmethod
+    def display_image_helper(image_id):
+        image_id = unquote(image_id)
+        image_path = os.path.join(IMAGE_DIR, image_id)
+        if os.path.exists(image_path):
+            return FileResponse(path=image_path, media_type='image/png')
+        # Try with .jpg
+        image_path_jpg = os.path.join(IMAGE_DIR, image_id + '.jpg')
+        if os.path.exists(image_path_jpg):
+            return FileResponse(path=image_path_jpg, media_type='image/jpeg')
+        # Try with .png
+        image_path_png = os.path.join(IMAGE_DIR, image_id + '.png')
+        if os.path.exists(image_path_png):
+            return FileResponse(path=image_path_png, media_type='image/png')
+        raise HTTPException(status_code=404, detail="Image not found")
 
     async def generate_image(self, business_idea: str, brand_guidelines: str) -> str:
         try:
