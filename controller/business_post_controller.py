@@ -119,27 +119,22 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching posts: {str(e)}")
 
-
+@staticmethod
+def display_image_helper(image_id):
+    image_id = unquote(image_id)
+    image_folder = os.path.join(os.getcwd(), 'images')
+    image_path = os.path.join(image_folder, image_id)
+    print(f"Looking for image at: {image_path}")
+    if os.path.exists(image_path):
+        return FileResponse(path=image_path, media_type='image/png')
+    # ... rest of logic ...
 
 @router.get('/display-image/{image_id}')
 def display_image(image_id: str):
     try:
-        image_id = unquote(image_id)
-        image_folder = 'images'
-        # Try with no extension
-        image_path = os.path.join(image_folder, image_id)
-        if os.path.exists(image_path):
-            return FileResponse(path=image_path, media_type='image/jpeg')
-        # Try with .jpg
-        image_path_jpg = os.path.join(image_folder, image_id + '.jpg')
-        if os.path.exists(image_path_jpg):
-            return FileResponse(path=image_path_jpg, media_type='image/jpeg')
-        # Try with .png
-        image_path_png = os.path.join(image_folder, image_id + '.png')
-        if os.path.exists(image_path_png):
-            return FileResponse(path=image_path_png, media_type='image/png')
-        raise HTTPException(status_code=404, detail="Image not found")
+        return display_image_helper(image_id)
     except Exception as e:
+        print(f"Error in display_image: {e}")
         raise HTTPException(detail=str(e), status_code=400)
     
 @router.post("/approve-post/{post_id}")

@@ -46,6 +46,7 @@ async def run_business_post_job():
                             image_id = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
                             if image_id:
                                 print(f"[Image Generation] Generated image for user {user_id}")
+                                # BusinessPostHelper.display_image_helper(image_id)
                             else:
                                 print(f"[Image Generation] No image generated for user {user_id}")
                         except Exception as e:
