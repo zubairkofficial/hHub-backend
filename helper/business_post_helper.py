@@ -29,11 +29,11 @@ class BusinessPostHelper:
         )
         self.image_prompt_template = (
             "Create a prompt for DALL-E to generate an engaging social media image that aligns with the following business idea and brand guidelines. "
-            "The prompt should be detailed, creative, and incorporate the brand's visual identity. "
-            "Focus on creating an image that would work well on social media platforms.\n\n"
+            "The prompt should be detailed, creative, and incorporate the brand's visual identity, especially the brand's color palette and design elements. "
+            "Focus on creating an image that would work well on social media platforms and visually reflects the brand's color and design.\n\n"
             "Business Idea: {business_idea}\n"
-            "Brand Guidelines: {brand_guidelines}\n\n"
-            "Generate a DALL-E prompt that is specific, descriptive, and would result in a visually appealing image."
+            "Brand Guidelines (including color and design): {brand_guidelines}\n\n"
+            "Generate a DALL-E prompt that is specific, descriptive, and would result in a visually appealing image that matches the brand's color and design."
         )
 
     async def generate_post(self, business_idea: str, brand_guidelines: str) -> str:
