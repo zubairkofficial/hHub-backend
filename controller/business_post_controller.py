@@ -78,15 +78,6 @@ async def get_post_settings(user_id: int = Query(...)):
         if not settings:
             raise HTTPException(status_code=404, detail="Settings not found")
 
-        # Generate a preview image if brand guidelines are provided
-        preview_image_id = None
-        if settings.brand_guidelines:
-            try:
-                preview_image_id = await helper.generate_image(settings.business_idea, settings.brand_guidelines)
-                print(f"[Image Generation] Generated preview image for user {user_id}")
-            except Exception as e:
-                print(f"[Image Generation] Error generating preview image for user {user_id}: {str(e)}")
-
         return PostSettingsResponse(
             id=settings.id,
             user_id=settings.user_id,
@@ -94,7 +85,7 @@ async def get_post_settings(user_id: int = Query(...)):
             brand_guidelines=settings.brand_guidelines,
             frequency=settings.frequency,
             posts_per_period=settings.posts_per_period,
-            preview_image_id=preview_image_id
+            preview_image_id=getattr(settings, 'preview_image_id', None)
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
