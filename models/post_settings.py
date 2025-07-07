@@ -9,6 +9,10 @@ class PostSettings(models.Model):
     posts_per_period = fields.IntField(default=1) 
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
+    weekly_days = fields.JSONField(null=True)  # e.g., ["Monday", "Wednesday"]
+    monthly_dates = fields.JSONField(null=True)  # e.g., ["2024-07-05", "2024-07-12"]
+    uploaded_file = fields.CharField(max_length=255, null=True)  # Stores the uploaded file name or path
+    extracted_file_text = fields.TextField(null=True)  # Stores all extracted text from uploaded file
 
     class Meta:
         table = "post_settings" 

@@ -41,10 +41,18 @@ class BusinessPostHelper:
             "Generate a DALL-E prompt that is specific, descriptive, and would result in a visually appealing image that matches the brand's color and design."
         )
 
-    async def generate_post(self, business_idea: str, brand_guidelines: str) -> str:
+    async def generate_post(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+        prompt_parts = []
+        if business_idea:
+            prompt_parts.append(f"Business Idea: {business_idea}")
+        if brand_guidelines:
+            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
+        if extracted_file_text:
+            prompt_parts.append(f"Additional Info: {extracted_file_text}")
+        full_prompt = "\n".join(prompt_parts)
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.default_prompt),
-            ("user", f"Business Idea: {business_idea}\nGuidelines: {brand_guidelines}")
+            ("user", full_prompt)
         ])
         formatted_prompt = prompt.format_messages()
         response = await self.llm.ainvoke(formatted_prompt)
@@ -101,15 +109,17 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, business_idea: str, brand_guidelines: str) -> str:
+    async def generate_image(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+        prompt_parts = []
+        if business_idea:
+            prompt_parts.append(f"Business Idea: {business_idea}")
+        if brand_guidelines:
+            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
+        if extracted_file_text:
+            prompt_parts.append(f"Additional Info: {extracted_file_text}")
+        full_prompt = "\n".join(prompt_parts)
+        image_prompt = await self.generate_image_prompt(full_prompt, "")
         try:
-            # First, generate an optimized prompt for DALL-E
-            image_prompt = await self.generate_image_prompt(business_idea, brand_guidelines)
-            if not isinstance(image_prompt, str):
-                print(f"Image prompt is not a string: {image_prompt}")
-                return None
-
-            # Use DALL-E to generate the image
             response = self.client.images.generate(
                 model="dall-e-3",
                 prompt=image_prompt,
@@ -117,7 +127,6 @@ class BusinessPostHelper:
                 quality="standard",
                 n=1
             )
-
             if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
                 image_url = response.data[0].url
                 image_id = self.save_image_from_url(image_url)
