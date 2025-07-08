@@ -75,7 +75,7 @@ async def run_business_post_job():
                     await BusinessPost.create(
                         user_id=user_id,
                         post=post_text,
-                        status='created',
+                        status='posted',
                         image_id=image_id
                     )
                     print(f"[Post Generation] Created new post for user {user_id} for period starting {period_start}.")

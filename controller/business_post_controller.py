@@ -144,24 +144,6 @@ def display_image(image_id: str):
         print(f"Error in display_image: {e}")
         raise HTTPException(detail=str(e), status_code=400)
     
-@router.post("/approve-post/{post_id}")
-async def approve_post(post_id: int = Path(..., description="ID of the post to approve")):
-    try:
-        post = await BusinessPost.get(id=post_id)
-        if not post:
-            raise HTTPException(status_code=404, detail="Post not found")
-
-        # Update post status to 'posted'
-        post.status = 'posted'
-        await post.save()
-
-        # Generate the post URL for sharing
-        post_url = f"https://your-website-url.com/post/{post.id}"  # Post URL for sharing
-        
-        return {"message": "Post approved and status updated to 'posted'", "id": post.id, "status": post.status, "post_url": post_url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error approving post: {str(e)}")
-    
 @router.get("/posts/{post_id}", response_model=BusinessPostResponse)
 async def get_post_by_id(post_id: int = Path(..., description="ID of the post to fetch")):
     try:
