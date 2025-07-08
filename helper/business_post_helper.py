@@ -63,15 +63,16 @@ class BusinessPostHelper:
         response = await self.llm.ainvoke(formatted_prompt)
         return response.content.strip()
 
-    async def generate_image_prompt(self, business_idea: str, brand_guidelines: str) -> str:
+    async def generate_image_prompt(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = "") -> str:
         # Format the template with the actual values to avoid KeyError
         system_prompt = self.image_prompt_template.format(
             business_idea=business_idea,
-            brand_guidelines=brand_guidelines
+            brand_guidelines=brand_guidelines,
+            extracted_file_text=extracted_file_text or ""
         )
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
-            ("user", f"Business Idea: {business_idea}\nGuidelines: {brand_guidelines}")
+            ("user", f"Business Idea: {business_idea}\nGuidelines: {brand_guidelines}\nExtracted File Text: {extracted_file_text or ''}")
         ])
         formatted_prompt = prompt.format_messages()
         response = await self.llm.ainvoke(formatted_prompt)
@@ -121,9 +122,9 @@ class BusinessPostHelper:
         if brand_guidelines:
             prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
         if extracted_file_text:
-            prompt_parts.append(f"Additional Info: {extracted_file_text}")
+            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
         full_prompt = "\n".join(prompt_parts)
-        image_prompt = await self.generate_image_prompt(full_prompt, "")
+        image_prompt = await self.generate_image_prompt(business_idea, brand_guidelines, extracted_file_text or "")
         try:
             response = self.client.images.generate(
                 model="dall-e-3",
@@ -133,10 +134,9 @@ class BusinessPostHelper:
                 n=1
             )
             if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
-                image_url = response.data[0].url
-                image_id = self.save_image_from_url(image_url)
-                print(f"[Image Generation] Image saved as images/{image_id}")
-                return image_id
+                image_url = self.save_image_from_url(response.data[0].url)
+                print(f"[Image Generation] Image saved as images/{image_url}")
+                return image_url
             else:
                 print(f"[Image Generation] No image URL returned. Response: {response}")
                 return None
