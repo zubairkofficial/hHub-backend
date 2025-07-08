@@ -180,69 +180,72 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
 
 @router.post("/post-settings/upload-file")
 async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile = File(...)):
-    uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
-    os.makedirs(uploads_dir, exist_ok=True)
-    file_location = os.path.join(uploads_dir, file.filename)
-    with open(file_location, "wb") as f:
-        f.write(await file.read())
+    try:
+        uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
+        os.makedirs(uploads_dir, exist_ok=True)
+        file_location = os.path.join(uploads_dir, file.filename)
+        with open(file_location, "wb") as f:
+            f.write(await file.read())
 
-    business_idea = None
-    brand_guidelines = None
-    all_text = None
-    # Extract data from the file
-    if file.filename.endswith('.txt'):
-        with open(file_location, "r", encoding="utf-8") as f:
-            content = f.read()
-            all_text = content
-            lines = content.splitlines()
-            if lines:
-                business_idea = lines[0]
-                brand_guidelines = "\n".join(lines[1:])
-    elif file.filename.endswith('.pdf'):
-        try:
-            from PyPDF2 import PdfReader
-            reader = PdfReader(file_location)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() or ""
-            all_text = text
-            lines = text.splitlines()
-            if lines:
-                business_idea = lines[0]
-                brand_guidelines = "\n".join(lines[1:])
-        except Exception as e:
-            print(f"PDF extraction error: {e}")
-    elif file.filename.endswith('.docx'):
-        try:
-            from docx import Document
-            doc = Document(file_location)
-            text = "\n".join([para.text for para in doc.paragraphs])
-            all_text = text
-            lines = text.splitlines()
-            if lines:
-                business_idea = lines[0]
-                brand_guidelines = "\n".join(lines[1:])
-        except Exception as e:
-            print(f"DOCX extraction error: {e}")
+        business_idea = None
+        brand_guidelines = None
+        all_text = None
+        # Extract data from the file
+        if file.filename.endswith('.txt'):
+            with open(file_location, "r", encoding="utf-8") as f:
+                content = f.read()
+                all_text = content
+                lines = content.splitlines()
+                if lines:
+                    business_idea = lines[0]
+                    brand_guidelines = "\n".join(lines[1:])
+        elif file.filename.endswith('.pdf'):
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(file_location)
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() or ""
+                all_text = text
+                lines = text.splitlines()
+                if lines:
+                    business_idea = lines[0]
+                    brand_guidelines = "\n".join(lines[1:])
+            except Exception as e:
+                print(f"PDF extraction error: {e}")
+        elif file.filename.endswith('.docx'):
+            try:
+                from docx import Document
+                doc = Document(file_location)
+                text = "\n".join([para.text for para in doc.paragraphs])
+                all_text = text
+                lines = text.splitlines()
+                if lines:
+                    business_idea = lines[0]
+                    brand_guidelines = "\n".join(lines[1:])
+            except Exception as e:
+                print(f"DOCX extraction error: {e}")
 
-    # Save the filename and extracted data in the user's PostSettings
-    settings = await PostSettings.filter(user_id=user_id).first()
-    if not settings:
-        raise HTTPException(status_code=404, detail="Settings not found")
-    settings.uploaded_file = file.filename
-    if business_idea:
-        settings.business_idea = business_idea
-    if brand_guidelines:
-        settings.brand_guidelines = brand_guidelines
-    if all_text:
-        settings.extracted_file_text = all_text
-    await settings.save()
+        # Save the filename and extracted data in the user's PostSettings
+        settings = await PostSettings.filter(user_id=user_id).first()
+        if not settings:
+            raise HTTPException(status_code=404, detail="Settings not found")
+        settings.uploaded_file = file.filename
+        if business_idea:
+            settings.business_idea = business_idea
+        if brand_guidelines:
+            settings.brand_guidelines = brand_guidelines
+        if all_text:
+            settings.extracted_file_text = all_text
+        await settings.save()
 
-    return {
-        "filename": file.filename,
-        "business_idea": business_idea,
-        "brand_guidelines": brand_guidelines,
-        "extracted_file_text": all_text,
-        "message": "File uploaded and data extracted successfully"
-    }
+        return {
+            "filename": file.filename,
+            "business_idea": business_idea,
+            "brand_guidelines": brand_guidelines,
+            "extracted_file_text": all_text,
+            "message": "File uploaded and data extracted successfully"
+        }
+    except Exception as e:
+        print(f"error {str(e)}")
 
