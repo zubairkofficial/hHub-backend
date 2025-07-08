@@ -8,6 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 import os
 from urllib.parse import unquote
+from fastapi import Body, Path, HTTPException
 router = APIRouter()
 
 class PostSettingsRequest(BaseModel):
@@ -159,6 +160,27 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
+    
+@router.put("/posts/{post_id}", response_model=BusinessPostResponse)
+async def update_post(
+    post_id: int = Path(..., description="ID of the post to update"),
+    post: str = Body(..., embed=True)
+):
+    try:
+        db_post = await BusinessPost.get(id=post_id)
+        if not db_post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        db_post.post = post
+        await db_post.save()
+        return BusinessPostResponse(
+            id=db_post.id,
+            post=db_post.post,
+            status=db_post.status,
+            created_at=db_post.created_at.isoformat(),
+            image_id=getattr(db_post, 'image_id', None)
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating post: {str(e)}")
 
 @router.post("/post-settings/upload-file")
 async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile = File(...)):

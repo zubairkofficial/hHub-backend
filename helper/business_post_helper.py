@@ -33,18 +33,19 @@ class BusinessPostHelper:
             "You are a creative social media manager. Given a business idea and brand guidelines, create a catchy, engaging social media post (2 to 4 lines) that promotes the business idea. For now, use only the business idea to write the post. The brand guidelines are provided for future use (such as image generation) and should not influence the text of the post at this stage."
         )
         self.image_prompt_template = (
-            "Create a modern, professional social media image for Instagram, inspired by the following business idea and brand guidelines. "
-            "The image should feature a clean, visually appealing background using the brand's color palette and design elements (such as wavy lines or abstract shapes). "
-            "Overlay a short, bold, catchy phrase (4 to 5 words) that captures the essence of the business idea. "
-            "The text should be prominent, easy to read, and visually integrated with the image. "
-            "The overall style should be similar to high-quality Instagram posts, with a polished, branded look. "
-            "You may include a person (smiling, professional) if it fits the business idea, or just use text and background. "
-            "Do NOT use more than 5 words in the text overlay. "
+            "Create a modern, minimal, and professional Instagram post image. "
+            "The background should be clean, simple, and consist of subtle wavy lines or abstract shapes, following the brand's color palette. "
+            "The design should not be too busy or distracting, keeping the focus on the text and visuals. "
+            "Overlay a short, bold, catchy phrase (4-5 words) in the center of the image. The text should be the focal point: large, easy to read, and high contrast with the background. "
+            "Ensure that if a person is included, they are clear, well-lit, and not obscured by the background, resembling the style of a high-quality Instagram post. "
+            "The overall style should be minimal, polished, and visually appealing. "
+            "Do NOT use more than 5 words in the text overlay, and make sure the background is not overly complex or busy. "
             "Business Idea: {business_idea}\n"
             "Brand Guidelines (including color and design): {brand_guidelines}\n"
             "Extracted File Text: {extracted_file_text}\n"
-            "Generate a DALL-E prompt that will result in an image like the provided examples: clean, modern, branded, with a short, bold text overlay."
-        )
+            "Generate a DALL-E prompt that will result in a clean, modern, branded image with a short, bold text overlay, similar to the provided examples."
+)
+
 
     async def generate_post(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
         prompt_parts = []
@@ -52,8 +53,10 @@ class BusinessPostHelper:
             prompt_parts.append(f"Business Idea: {business_idea}")
         if brand_guidelines:
             prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
-        if extracted_file_text:
-            prompt_parts.append(f"Additional Info: {extracted_file_text}")
+        if not business_idea and not brand_guidelines and extracted_file_text:
+            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
+        elif extracted_file_text:
+            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
         full_prompt = "\n".join(prompt_parts)
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.default_prompt),
@@ -121,7 +124,9 @@ class BusinessPostHelper:
             prompt_parts.append(f"Business Idea: {business_idea}")
         if brand_guidelines:
             prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
-        if extracted_file_text:
+        if not business_idea and not brand_guidelines and extracted_file_text:
+            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
+        elif extracted_file_text:
             prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
         full_prompt = "\n".join(prompt_parts)
         image_prompt = await self.generate_image_prompt(business_idea, brand_guidelines, extracted_file_text or "")
