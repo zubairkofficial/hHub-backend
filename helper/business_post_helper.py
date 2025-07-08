@@ -33,12 +33,17 @@ class BusinessPostHelper:
             "You are a creative social media manager. Given a business idea and brand guidelines, create a catchy, engaging social media post (2 to 4 lines) that promotes the business idea. For now, use only the business idea to write the post. The brand guidelines are provided for future use (such as image generation) and should not influence the text of the post at this stage."
         )
         self.image_prompt_template = (
-            "Create a prompt for DALL-E to generate an engaging social media image that aligns with the following business idea and brand guidelines. "
-            "The prompt should be detailed, creative, and incorporate the brand's visual identity, especially the brand's color palette and design elements. "
-            "Focus on creating an image that would work well on social media platforms and visually reflects the brand's color and design.\n\n"
+            "Create a modern, professional social media image for Instagram, inspired by the following business idea and brand guidelines. "
+            "The image should feature a clean, visually appealing background using the brand's color palette and design elements (such as wavy lines or abstract shapes). "
+            "Overlay a short, bold, catchy phrase (4 to 5 words) that captures the essence of the business idea. "
+            "The text should be prominent, easy to read, and visually integrated with the image. "
+            "The overall style should be similar to high-quality Instagram posts, with a polished, branded look. "
+            "You may include a person (smiling, professional) if it fits the business idea, or just use text and background. "
+            "Do NOT use more than 5 words in the text overlay. "
             "Business Idea: {business_idea}\n"
-            "Brand Guidelines (including color and design): {brand_guidelines}\n\n"
-            "Generate a DALL-E prompt that is specific, descriptive, and would result in a visually appealing image that matches the brand's color and design."
+            "Brand Guidelines (including color and design): {brand_guidelines}\n"
+            "File Guidelines: {file_guidelines}\n"
+            "Generate a DALL-E prompt that will result in an image like the provided examples: clean, modern, branded, with a short, bold text overlay."
         )
 
     async def generate_post(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
