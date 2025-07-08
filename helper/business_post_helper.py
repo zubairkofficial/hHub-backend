@@ -42,7 +42,7 @@ class BusinessPostHelper:
             "Do NOT use more than 5 words in the text overlay. "
             "Business Idea: {business_idea}\n"
             "Brand Guidelines (including color and design): {brand_guidelines}\n"
-            "File Guidelines: {file_guidelines}\n"
+            "Extracted File Text: {extracted_file_text}\n"
             "Generate a DALL-E prompt that will result in an image like the provided examples: clean, modern, branded, with a short, bold text overlay."
         )
 
