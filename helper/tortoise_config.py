@@ -21,7 +21,8 @@ TORTOISE_CONFIG = {
                 'models.system_prompt',
                 'models.job_tracker',
                 'models.business_post',
-                'models.post_settings'
+                'models.post_settings',
+                'models.post_draft'
             ],
             'default_connection': 'default'
         },
