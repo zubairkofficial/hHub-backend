@@ -8,7 +8,8 @@ class PostDraft(models.Model):
     keywords = fields.JSONField(null=True)     # Step 2
     post_options = fields.JSONField(null=True) # List of generated post texts (step 3)
     selected_post_index = fields.IntField(null=True) # Which post was selected
-    image_ids = fields.JSONField(null=True)    # List of image ids (uploaded or generated) for each post option
+    image_ids = fields.JSONField(null=True)
+    status = fields.CharField(max_length=32, default='draft')
     selected_image_id = fields.TextField(null=True)  # Final image
     is_complete = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)

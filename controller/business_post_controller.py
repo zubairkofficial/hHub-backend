@@ -150,10 +150,11 @@ async def get_post_settings(user_id: int = Query(...)):
 @router.get("/posts", response_model=List[BusinessPostResponse])
 async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
     try:
+        # Only fetch posts that are actually published and from automation
         if user_id is not None:
-            posts = await BusinessPost.filter(user_id=user_id).order_by('-created_at')
+            posts = await BusinessPost.filter(user_id=user_id, status='posted', source='auto').order_by('-created_at')
         else:
-            posts = await BusinessPost.all().order_by('-created_at')
+            posts = await BusinessPost.filter(status='posted', source='auto').order_by('-created_at')
         return [
             BusinessPostResponse(
                 id=post.id,
@@ -170,9 +171,22 @@ def display_image_helper(image_id):
     return BusinessPostHelper.display_image_helper(image_id)
 
 @router.get('/display-image/{image_id}')
-def display_image(image_id: str):
+def display_image(image_id: str, temp: int = 0):
     try:
-        return display_image_helper(image_id)
+        if temp:
+            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+            image_path = os.path.join(temp_dir, image_id)
+        else:
+            images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+            image_path = os.path.join(images_dir, image_id)
+        if os.path.exists(image_path):
+            return FileResponse(path=image_path, media_type='image/png')
+        # Try with .jpg
+        if os.path.exists(image_path + '.jpg'):
+            return FileResponse(path=image_path + '.jpg', media_type='image/jpeg')
+        if os.path.exists(image_path + '.png'):
+            return FileResponse(path=image_path + '.png', media_type='image/png')
+        raise HTTPException(status_code=404, detail="Image not found")
     except Exception as e:
         print(f"Error in display_image: {e}")
         raise HTTPException(detail=str(e), status_code=400)
@@ -193,26 +207,7 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post: {str(e)}")
     
-@router.put("/posts/{post_id}", response_model=BusinessPostResponse)
-async def update_post(
-    post_id: int = Path(..., description="ID of the post to update"),
-    post: str = Body(..., embed=True)
-):
-    try:
-        db_post = await BusinessPost.get(id=post_id)
-        if not db_post:
-            raise HTTPException(status_code=404, detail="Post not found")
-        db_post.post = post
-        await db_post.save()
-        return BusinessPostResponse(
-            id=db_post.id,
-            post=db_post.post,
-            status=db_post.status,
-            created_at=db_post.created_at.isoformat(),
-            image_id=getattr(db_post, 'image_id', None)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating post: {str(e)}")
+
 
 @router.post("/post-settings/upload-file")
 async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile = File(...)):
@@ -356,6 +351,14 @@ async def upload_image(user_id: str = Form(...), file: UploadFile = File(...)):
         return {"image_id": filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
+    
+@router.get("/business-post/display-image/{filename}")
+async def display_image(filename: str, temp: int = 0):
+    folder = 'temp_images' if temp else 'images'
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', folder, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(file_path)
 
 @router.post("/business-post/draft/image")
 async def save_selected_image(request: ImageSelectionRequest):
@@ -403,20 +406,20 @@ async def generate_posts(request: GeneratePostsRequest):
 @router.post("/business-post/upload-image-for-post")
 async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form(...), file: UploadFile = File(...)):
     try:
-        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
-        os.makedirs(images_dir, exist_ok=True)
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        os.makedirs(temp_dir, exist_ok=True)
         filename = f"{user_id}_{file.filename}"
-        file_path = os.path.join(images_dir, filename)
+        file_path = os.path.join(temp_dir, filename)
         with open(file_path, "wb") as f:
             f.write(await file.read())
-        # Save image_id to draft
+        # Save image_id to draft (as temp reference)
         draft = await PostDraft.filter(user_id=user_id, is_complete=False).order_by('-updated_at').first()
         if draft:
             image_ids = draft.image_ids or [None, None, None]
             image_ids[post_index] = filename
             draft.image_ids = image_ids
             await draft.save()
-        return {"image_id": filename, "image_url": f"/api/business-post/display-image/{filename}", "post_index": post_index}
+        return {"image_id": filename, "image_url": f"/api/business-post/display-image/{filename}?temp=1", "post_index": post_index}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
@@ -432,10 +435,17 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             brand_guidelines=settings.brand_guidelines,
             extracted_file_text=request.post_text
         )
-        # Save image_id to draft
+        # Move generated image to temp_images if not already there
+        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        os.makedirs(temp_dir, exist_ok=True)
+        src_path = os.path.join(images_dir, image_id)
+        temp_path = os.path.join(temp_dir, image_id)
+        if os.path.exists(src_path):
+            os.rename(src_path, temp_path)
+        # Save image_id to draft (as temp reference)
         draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
         if draft:
-            # Find the index of the post_text in post_options
             post_options = draft.post_options or []
             try:
                 post_index = post_options.index(request.post_text)
@@ -445,23 +455,33 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             image_ids[post_index] = image_id
             draft.image_ids = image_ids
             await draft.save()
-        return {"image_id": image_id, "image_url": f"/api/business-post/display-image/{image_id}", "post_text": request.post_text}
+        return {"image_id": image_id, "image_url": f"/api/business-post/display-image/{image_id}?temp=1", "post_text": request.post_text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
 
 @router.post("/business-post/draft/select-post")
 async def select_post(request: SelectPostRequest):
     try:
+        print(f"[select_post] Incoming request: {request}")
         draft = await PostDraft.get(id=request.draft_id)
+        print(f"[select_post] Loaded draft: {draft}")
         if not draft:
+            print("[select_post] Draft not found")
             raise HTTPException(status_code=404, detail="Draft not found")
         # Save selected post and image
-        draft.selected_post_index = draft.post_options.index(request.post_text) if draft.post_options else 0
+        if draft.post_options and request.post_text in draft.post_options:
+            post_index = draft.post_options.index(request.post_text)
+        else:
+            print(f"[select_post] post_text not found in post_options. post_text: {request.post_text}, post_options: {draft.post_options}")
+            post_index = 0
+        draft.selected_post_index = post_index
         draft.selected_image_id = request.image_id
-        draft.current_step = 4  # Move to review step
+        draft.current_step = 4
         await draft.save()
+        print(f"[select_post] Selection saved: post_index={post_index}, image_id={request.image_id}")
         return {"message": "Selection saved"}
     except Exception as e:
+        print(f"[select_post] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Error selecting post: {str(e)}")
 
 @router.post("/business-post/draft/edit-post")
@@ -495,4 +515,47 @@ async def generate_idea(user_id: str = Form(...)):
         return {"idea": idea}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating idea: {str(e)}")
+
+@router.post("/business-post/publish/{draft_id}")
+async def publish_post_from_draft(draft_id: int):
+    try:
+        draft = await PostDraft.get(id=draft_id)
+        if not draft:
+            raise HTTPException(status_code=404, detail="Draft not found")
+        if draft.selected_post_index is not None and draft.post_options:
+            post_content = draft.post_options[draft.selected_post_index]
+        else:
+            post_content = draft.content
+        # Create BusinessPost with selected image, status 'pending', source 'manual'
+        post = await BusinessPost.create(
+            user_id=draft.user_id,
+            post=post_content,
+            status='pending',
+            image_id=draft.selected_image_id,
+            source='manual'
+        )
+        draft.is_complete = True
+        draft.status = 'published'
+        await draft.save()
+        return {
+            "id": post.id,
+            "post": post.post,
+            "status": post.status,
+            "created_at": post.created_at.isoformat(),
+            "image_id": post.image_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error publishing post: {str(e)}")
+
+@router.post("/business-post/mark-posted/{post_id}")
+async def mark_post_as_posted(post_id: int):
+    try:
+        post = await BusinessPost.get(id=post_id)
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        post.status = 'posted'
+        await post.save()
+        return {"message": "Post marked as posted", "id": post.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error marking post as posted: {str(e)}")
 
