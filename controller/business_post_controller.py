@@ -10,6 +10,8 @@ import os
 from urllib.parse import unquote
 from fastapi import Body, Path, HTTPException
 from models.post_draft import PostDraft
+import logging
+import shutil
 
 router = APIRouter()
 
@@ -425,6 +427,7 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
 
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest):
+    logging.warning(f"Request body: {request}")
     try:
         settings = await PostSettings.filter(user_id=request.user_id).first()
         if not settings:
@@ -455,8 +458,14 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             image_ids[post_index] = image_id
             draft.image_ids = image_ids
             await draft.save()
-        return {"image_id": image_id, "image_url": f"/api/business-post/display-image/{image_id}?temp=1", "post_text": request.post_text}
+        logging.warning("Returning image generation response")
+        return {
+            "image_id": image_id,
+            "image_url": f"/api/business-post/display-image/{image_id}?temp=1",
+            "post_text": request.post_text
+        }
     except Exception as e:
+        logging.error(f"Error in image generation: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
 
 @router.post("/business-post/draft/select-post")
@@ -478,6 +487,13 @@ async def select_post(request: SelectPostRequest):
         draft.selected_image_id = request.image_id
         draft.current_step = 4
         await draft.save()
+        # Move selected image from temp_images to images if needed
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+        temp_path = os.path.join(temp_dir, request.image_id)
+        images_path = os.path.join(images_dir, request.image_id)
+        if os.path.exists(temp_path) and not os.path.exists(images_path):
+            shutil.move(temp_path, images_path)
         print(f"[select_post] Selection saved: post_index={post_index}, image_id={request.image_id}")
         return {"message": "Selection saved"}
     except Exception as e:
@@ -507,7 +523,7 @@ async def generate_idea(user_id: str = Form(...)):
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
         helper = BusinessPostHelper()
-        idea = await helper.generate_post(
+        idea = await helper.generate_short_idea(
             business_idea=settings.business_idea,
             brand_guidelines=settings.brand_guidelines,
             extracted_file_text=settings.extracted_file_text

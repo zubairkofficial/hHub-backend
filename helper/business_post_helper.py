@@ -81,6 +81,26 @@ class BusinessPostHelper:
         response = await self.llm.ainvoke(formatted_prompt)
         return response.content.strip()
 
+    async def generate_short_idea(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+        short_idea_prompt = (
+            "You are a creative social media manager. Given a business idea, brand guidelines, and extracted file text, generate a catchy, engaging social media idea in 1 to 2 lines only. Do NOT include hashtags or tags. The idea should be concise, clear, and suitable as the main message for a post. Use all provided information to inspire the idea, but keep it short and punchy."
+        )
+        prompt_parts = []
+        if business_idea:
+            prompt_parts.append(f"Business Idea: {business_idea}")
+        if brand_guidelines:
+            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
+        if extracted_file_text:
+            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
+        full_prompt = "\n".join(prompt_parts)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", short_idea_prompt),
+            ("user", full_prompt)
+        ])
+        formatted_prompt = prompt.format_messages()
+        response = await self.llm.ainvoke(formatted_prompt)
+        return response.content.strip()
+
     @staticmethod
     def save_image_from_url(image_url, filename=None):
         import requests
