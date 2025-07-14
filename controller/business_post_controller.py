@@ -12,6 +12,7 @@ from fastapi import Body, Path, HTTPException
 from models.post_draft import PostDraft
 import logging
 import shutil
+import httpx
 
 router = APIRouter()
 
@@ -223,6 +224,7 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
         business_idea = None
         brand_guidelines = None
         all_text = None
+        summary = None
         # Extract data from the file
         if file.filename.endswith('.txt'):
             with open(file_location, "r", encoding="utf-8") as f:
@@ -234,18 +236,16 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
                     brand_guidelines = "\n".join(lines[1:])
         elif file.filename.endswith('.pdf'):
             try:
-                from PyPDF2 import PdfReader
-                reader = PdfReader(file_location)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() or ""
+                import pdfplumber
+                with pdfplumber.open(file_location) as pdf:
+                    text = "\n".join(page.extract_text() or "" for page in pdf.pages)
                 all_text = text
                 lines = text.splitlines()
                 if lines:
                     business_idea = lines[0]
                     brand_guidelines = "\n".join(lines[1:])
             except Exception as e:
-                print(f"PDF extraction error: {e}")
+                print(f"pdfplumber extraction error: {e}")
         elif file.filename.endswith('.docx'):
             try:
                 from docx import Document
@@ -259,7 +259,43 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
             except Exception as e:
                 print(f"DOCX extraction error: {e}")
 
-        # Save the filename and extracted data in the user's PostSettings
+        # Generate summary using external LLM if all_text is available
+        if all_text:
+            LLM_API_URL = "https://api.openai.com/v1/chat/completions"
+            LLM_API_KEY = os.getenv("OPENAI_API_KEY")
+            prompt = (
+                "You are an expert in social media branding. "
+                "Given the following extracted content from a brand guidelines document, generate a comprehensive summary of the post guidelines. "
+                "The summary should describe how posts should look, including logo usage, color palette, typography, and any other visual or content rules. "
+                "Focus on actionable instructions for generating social media posts that match the brand's style.\n\n"
+                f"Extracted Content:\n{all_text}\n\nSummary:"
+            )
+            headers = {
+                "Authorization": f"Bearer {LLM_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 512,
+                "temperature": 0.7
+            }
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    response = await client.post(LLM_API_URL, headers=headers, json=data)
+                    response.raise_for_status()
+                    result = response.json()
+                    summary = result["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                print(f"LLM summarization error: {e}")
+                summary = all_text  # fallback to raw text
+        else:
+            summary = None
+
+        # Save the filename and extracted summary in the user's PostSettings
         settings = await PostSettings.filter(user_id=user_id).first()
         if not settings:
             raise HTTPException(status_code=404, detail="Settings not found")
@@ -268,16 +304,17 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
             settings.business_idea = business_idea
         if brand_guidelines:
             settings.brand_guidelines = brand_guidelines
-        if all_text:
-            settings.extracted_file_text = all_text
+        if summary:
+            settings.extracted_file_text = summary
         await settings.save()
 
+        print(summary)
         return {
             "filename": file.filename,
             "business_idea": business_idea,
             "brand_guidelines": brand_guidelines,
-            "extracted_file_text": all_text,
-            "message": "File uploaded and data extracted successfully"
+            "extracted_file_text": summary,
+            "message": "File uploaded, data extracted, and summary generated successfully"
         }
     except Exception as e:
         print(f"error {str(e)}")

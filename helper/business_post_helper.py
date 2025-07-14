@@ -140,7 +140,7 @@ class BusinessPostHelper:
 
     async def generate_image(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
         prompt_parts = []
-        if business_idea:
+        if business_idea:  
             prompt_parts.append(f"Business Idea: {business_idea}")
         if brand_guidelines:
             prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
@@ -151,6 +151,7 @@ class BusinessPostHelper:
         full_prompt = "\n".join(prompt_parts)
         image_prompt = await self.generate_image_prompt(business_idea, brand_guidelines, extracted_file_text or "")
         try:
+            print(f"this is the images prompt will be use to create the image {image_prompt}")
             response = self.client.images.generate(
                 model="dall-e-3",
                 prompt=image_prompt,
