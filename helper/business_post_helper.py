@@ -24,13 +24,13 @@ class BusinessPostHelper:
     def __init__(self):
         self.llm = ChatOpenAI(
             model="gpt-4o-mini",
-            temperature=0.7,
+            temperature=1.2,  # Increased for more randomness/uniqueness
             api_key=os.getenv("OPENAI_API_KEY")
         )
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         print(f"key: {os.getenv('OPENAI_API_KEY')}")
         self.default_prompt = (
-            "You are a creative social media manager. Given a business idea and brand guidelines, create a catchy, engaging social media post (2 to 4 lines) that promotes the business idea. For now, use only the business idea to write the post. The brand guidelines are provided for future use (such as image generation) and should not influence the text of the post at this stage."
+            "You are a creative social media manager. Given a business idea and brand guidelines, create a catchy, engaging, and unique social media post (2 to 4 lines) that promotes the business idea. For now, use only the business idea to write the post. The brand guidelines are provided for future use (such as image generation) and should not influence the text of the post at this stage. Do NOT repeat or closely resemble any previous ideas or posts. Each output must be fresh and different from earlier ones."
         )
         self.image_prompt_template = (
             "Create a modern, minimal, and professional Instagram post image. "
@@ -58,6 +58,8 @@ class BusinessPostHelper:
         elif extracted_file_text:
             prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
         full_prompt = "\n".join(prompt_parts)
+        # Add a unique instruction to the user prompt
+        full_prompt += "\nMake sure this post is different from any previous posts or ideas."
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.default_prompt),
             ("user", full_prompt)
@@ -83,7 +85,7 @@ class BusinessPostHelper:
 
     async def generate_short_idea(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
         short_idea_prompt = (
-            "You are a creative social media manager. Given a business idea, brand guidelines, and extracted file text, generate a catchy, engaging social media idea in 1 to 2 lines only. Do NOT include hashtags or tags. The idea should be concise, clear, and suitable as the main message for a post. Use all provided information to inspire the idea, but keep it short and punchy."
+            "You are a creative social media manager. Given a business idea, brand guidelines, and extracted file text, generate a catchy, engaging, and unique social media idea in 1 to 2 lines only. Do NOT include hashtags or tags. The idea should be concise, clear, and suitable as the main message for a post. Use all provided information to inspire the idea, but keep it short and punchy. Do NOT repeat or closely resemble any previous ideas or posts. Each output must be fresh and different from earlier ones."
         )
         prompt_parts = []
         if business_idea:
@@ -93,6 +95,8 @@ class BusinessPostHelper:
         if extracted_file_text:
             prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
         full_prompt = "\n".join(prompt_parts)
+        # Add a unique instruction to the user prompt
+        full_prompt += "\nMake sure this idea is different from any previous ideas or posts."
         prompt = ChatPromptTemplate.from_messages([
             ("system", short_idea_prompt),
             ("user", full_prompt)
