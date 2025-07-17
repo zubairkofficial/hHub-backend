@@ -9,6 +9,9 @@ from urllib.parse import unquote, urlparse
 import re
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
+import time
+import traceback
+from models.post_prompt_settings import PostPromptSettings
 
 
 load_dotenv()
@@ -24,86 +27,41 @@ class BusinessPostHelper:
     def __init__(self):
         self.llm = ChatOpenAI(
             model="gpt-4o-mini",
-            temperature=1.2,  # Increased for more randomness/uniqueness
+            temperature=1.2,
             api_key=os.getenv("OPENAI_API_KEY")
         )
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         print(f"key: {os.getenv('OPENAI_API_KEY')}")
-        self.default_prompt = (
-            "You are a creative social media manager. Given a business idea and brand guidelines, create a catchy, engaging, and unique social media post (2 to 4 lines) that promotes the business idea. For now, use only the business idea to write the post. The brand guidelines are provided for future use (such as image generation) and should not influence the text of the post at this stage. Do NOT repeat or closely resemble any previous ideas or posts. Each output must be fresh and different from earlier ones."
-        )
-        self.image_prompt_template = (
-            "Create a modern, minimal, and professional Instagram post image. "
-            "The background should be clean, simple, and consist of subtle wavy lines or abstract shapes, following the brand's color palette. "
-            "The design should not be too busy or distracting, keeping the focus on the text and visuals. "
-            "Overlay a short, bold, catchy phrase (4-5 words) in the center of the image. The text should be the focal point: large, easy to read, and high contrast with the background. "
-            "Ensure that if a person is included, they are clear, well-lit, and not obscured by the background, resembling the style of a high-quality Instagram post. "
-            "The overall style should be minimal, polished, and visually appealing. "
-            "Do NOT use more than 5 words in the text overlay, and make sure the background is not overly complex or busy. "
-            "Business Idea: {business_idea}\n"
-            "Brand Guidelines (including color and design): {brand_guidelines}\n"
-            "Extracted File Text: {extracted_file_text}\n"
-            "Generate a DALL-E prompt that will result in a clean, modern, branded image with a short, bold text overlay, similar to the provided examples."
-)
-
 
     async def generate_post(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+        prompts = await self.get_dynamic_prompts()
+        prompt = prompts["post_prompt"]
         prompt_parts = []
         if business_idea:
-            prompt_parts.append(f"Business Idea: {business_idea}")
+            prompt_parts.append(f"Business Idea: {business_idea} \n")
         if brand_guidelines:
-            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
-        if not business_idea and not brand_guidelines and extracted_file_text:
-            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
-        elif extracted_file_text:
-            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
-        full_prompt = "\n".join(prompt_parts)
+            prompt_parts.append(f"Brand Guidelines: {brand_guidelines} \n")
+        post_data = "\n".join(prompt_parts)
+        user_data = f"Data = {post_data}"
         # Add a unique instruction to the user prompt
-        full_prompt += "\nMake sure this post is different from any previous posts or ideas."
         prompt = ChatPromptTemplate.from_messages([
-            ("system", self.default_prompt),
-            ("user", full_prompt)
+            ("system", prompt),
+            ("user", user_data)
         ])
         formatted_prompt = prompt.format_messages()
         response = await self.llm.ainvoke(formatted_prompt)
         return response.content.strip()
 
-    async def generate_image_prompt(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = "") -> str:
-        # Format the template with the actual values to avoid KeyError
-        system_prompt = self.image_prompt_template.format(
-            business_idea=business_idea,
-            brand_guidelines=brand_guidelines,
-            extracted_file_text=extracted_file_text or ""
-        )
+    async def generate_short_idea(self, user_text: str) -> str:
+        prompts = await self.get_dynamic_prompts()
+        prompt = prompts["idea_prompt"]
         prompt = ChatPromptTemplate.from_messages([
-            ("system", system_prompt),
-            ("user", f"Business Idea: {business_idea}\nGuidelines: {brand_guidelines}\nExtracted File Text: {extracted_file_text or ''}")
+            ("system", prompt),
+            ("user", user_text)
         ])
         formatted_prompt = prompt.format_messages()
         response = await self.llm.ainvoke(formatted_prompt)
-        return response.content.strip()
-
-    async def generate_short_idea(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
-        short_idea_prompt = (
-            "You are a creative social media manager. Given a business idea, brand guidelines, and extracted file text, generate a catchy, engaging, and unique social media idea in 1 to 2 lines only. Do NOT include hashtags or tags. The idea should be concise, clear, and suitable as the main message for a post. Use all provided information to inspire the idea, but keep it short and punchy. Do NOT repeat or closely resemble any previous ideas or posts. Each output must be fresh and different from earlier ones."
-        )
-        prompt_parts = []
-        if business_idea:
-            prompt_parts.append(f"Business Idea: {business_idea}")
-        if brand_guidelines:
-            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
-        if extracted_file_text:
-            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
-        full_prompt = "\n".join(prompt_parts)
-        # Add a unique instruction to the user prompt
-        full_prompt += "\nMake sure this idea is different from any previous ideas or posts."
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", short_idea_prompt),
-            ("user", full_prompt)
-        ])
-        formatted_prompt = prompt.format_messages()
-        response = await self.llm.ainvoke(formatted_prompt)
-        return response.content.strip()
+        return response.content
 
     @staticmethod
     def save_image_from_url(image_url, filename=None):
@@ -142,34 +100,54 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+    async def generate_image(self, brand_guidelines: str, post_text: str) -> str:
+        prompts = await self.get_dynamic_prompts()
+        prompt = prompts["image_prompt"]
         prompt_parts = []
-        if business_idea:  
-            prompt_parts.append(f"Business Idea: {business_idea}")
         if brand_guidelines:
-            prompt_parts.append(f"Brand Guidelines: {brand_guidelines}")
-        if not business_idea and not brand_guidelines and extracted_file_text:
-            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
-        elif extracted_file_text:
-            prompt_parts.append(f"Extracted File Text: {extracted_file_text}")
-        full_prompt = "\n".join(prompt_parts)
-        image_prompt = await self.generate_image_prompt(business_idea, brand_guidelines, extracted_file_text or "")
-        try:
-            print(f"this is the images prompt will be use to create the image {image_prompt}")
-            response = self.client.images.generate(
-                model="dall-e-3",
-                prompt=image_prompt,
-                size="1024x1024",
-                quality="standard",
-                n=1
-            )
-            if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
-                image_url = self.save_image_from_url(response.data[0].url)
-                print(f"[Image Generation] Image saved as images/{image_url}")
-                return image_url
-            else:
-                print(f"[Image Generation] No image URL returned. Response: {response}")
-                return None
-        except Exception as e:
-            print(f"Error generating image: {str(e)}")
-            return None 
+            prompt_parts.append(f"Brand Guidelines: {brand_guidelines} \n")
+        
+        prompt_parts.append(f"Post Content: {post_text} \n")
+        image_prompt = prompt
+        max_retries = 3
+        image_prompt += "".join(prompt_parts)
+        for attempt in range(max_retries):
+            try:
+                response = self.client.images.generate(
+                    model="dall-e-3",
+                    prompt=image_prompt,
+                    size="1024x1024",
+                    quality="standard",
+                    n=1
+                )
+                if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
+                    image_url = self.save_image_from_url(response.data[0].url)
+                    print(f"[Image Generation] Image saved as images/{image_url}")
+                    return image_url
+                else:
+                    print(f"[Image Generation] No image URL returned. Response: {response}")
+                    return None
+            except Exception as e:
+                print(f"Error generating image (attempt {attempt+1}/{max_retries}): {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2)  # Wait before retrying
+                else:
+                    import traceback
+                    traceback.print_exc()
+                    return None 
+
+    @staticmethod
+    async def get_dynamic_prompts():
+        prompt = await PostPromptSettings.first()
+        if prompt:
+            return {
+                "post_prompt": prompt.post_prompt,
+                "idea_prompt": prompt.idea_prompt,
+                "image_prompt": prompt.image_prompt,
+            }
+        # Fallbacks if needed
+        return {
+            "post_prompt": "",
+            "idea_prompt": "",
+            "image_prompt": "",
+        } 

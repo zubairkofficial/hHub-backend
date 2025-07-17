@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Path, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from helper.business_post_helper import BusinessPostHelper
 from models.post_settings import PostSettings
 from models.business_post import BusinessPost
@@ -14,6 +14,7 @@ import logging
 import shutil
 import httpx
 import asyncio
+from models.post_prompt_settings import PostPromptSettings
 
 router = APIRouter()
 
@@ -58,8 +59,14 @@ class DraftRequest(BaseModel):
     current_step: int
     content: Optional[str] = None
     keywords: Optional[list] = None
+    post_options: Optional[list] = None
+    selected_post_index: Optional[int] = None
     image_id: Optional[str] = None
+    image_ids: Optional[list] = None
+    selected_image_id: Optional[str] = None
     is_draft: bool = True
+    draft_id: Optional[int] = None
+    is_complete: bool = False
 
 class ImageSelectionRequest(BaseModel):
     draft_id: int
@@ -68,7 +75,8 @@ class ImageSelectionRequest(BaseModel):
 
 class GeneratePostsRequest(BaseModel):
     user_id: str
-    keywords: list
+    idea: str
+    keywords: str
 
 class GenerateImageForPostRequest(BaseModel):
     user_id: str
@@ -88,6 +96,11 @@ class BusinessPostUpdateRequest(BaseModel):
     title: Optional[str] = None
     image_id: Optional[str] = None
     status:Optional[str] = None
+
+class GenerateIdeaPayload(BaseModel):
+    user_id: str = Field(...)
+    user_text: str = Field(...)
+
 
 helper = BusinessPostHelper()
 
@@ -160,13 +173,12 @@ async def get_post_settings(user_id: int = Query(...)):
 @router.get("/posts", response_model=List[BusinessPostResponse])
 async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
     try:
-        # Only fetch posts that are actually published and from automation
         if user_id is not None:
-            posts = await BusinessPost.filter(user_id=user_id, status='posted', source='auto').order_by('-created_at')
-            drafts = await PostDraft.filter(user_id=user_id, status='draft', is_complete=False).order_by('-created_at')
+            posts = await BusinessPost.filter(user_id=user_id).order_by('-created_at')
+            drafts = await PostDraft.filter(user_id=user_id).order_by('-created_at')
         else:
-            posts = await BusinessPost.filter(status='posted', source='auto').order_by('-created_at')
-            drafts = await PostDraft.filter(status='draft', is_complete=False).order_by('-created_at')
+            posts = await BusinessPost.all().order_by('-created_at')
+            drafts = await PostDraft.all().order_by('-created_at')
         result = [
             BusinessPostResponse(
                 id=post.id,
@@ -176,23 +188,23 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 image_id=getattr(post, 'image_id', None)
             ) for post in posts
         ]
-        # Add drafts as posts with status 'draft'
         for draft in drafts:
-            # Use selected post option if available, else content
+            draft = await PostDraft.get(id=draft.id)
             post_text = None
             if draft.post_options and draft.selected_post_index is not None and 0 <= draft.selected_post_index < len(draft.post_options):
                 post_text = draft.post_options[draft.selected_post_index]
             else:
                 post_text = draft.content
-            result.append(BusinessPostResponse(
-                id=draft.id,
-                post=post_text or "",
-                status='draft',
-                created_at=draft.created_at.isoformat(),
-                image_id=getattr(draft, 'selected_image_id', None)
-            ))
-        # Sort all by created_at descending
-        result.sort(key=lambda x: x.created_at, reverse=True)
+            result.append({
+                "id": draft.id,
+                "post": post_text or "",
+                "status": "draft",
+                "created_at": draft.created_at.isoformat(),
+                "image_id": getattr(draft, 'selected_image_id', None),
+                "is_complete": draft.is_complete,
+                "current_step": draft.current_step
+            })
+        result.sort(key=lambda x: x["created_at"] if isinstance(x, dict) else x.created_at, reverse=True)
         print(f"result of the send user posts {result}")
         return result
     except Exception as e:
@@ -303,7 +315,7 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
                 "Content-Type": "application/json"
             }
             data = {
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-4o-mini",
                 "messages": [
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": prompt}
@@ -350,19 +362,43 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
 @router.post("/business-post/draft")
 async def save_or_update_draft(request: DraftRequest):
     try:
-        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
-        if not draft:
+        draft_id = getattr(request, "draft_id", None)
+        is_complete = getattr(request, "is_complete", False)
+        if draft_id:
+            draft = await PostDraft.get(id=draft_id)
+            if not draft:
+                raise HTTPException(status_code=404, detail="Draft not found")
+            draft.current_step = request.current_step
+            draft.content = request.content
+            draft.keywords = request.keywords
+            draft.post_options = getattr(request, "post_options", None)
+            draft.selected_post_index = getattr(request, "selected_post_index", None)
+            draft.image_ids = getattr(request, "image_ids", None)
+            draft.selected_image_id = getattr(request, "selected_image_id", None)
+            draft.is_complete = is_complete
+            await draft.save()
+        else:
             draft = await PostDraft.create(
                 user_id=request.user_id,
                 current_step=request.current_step,
                 content=request.content,
                 keywords=request.keywords,
+                post_options=getattr(request, "post_options", None),
+                selected_post_index=getattr(request, "selected_post_index", None),
+                image_ids=getattr(request, "image_ids", None),
+                selected_image_id=getattr(request, "selected_image_id", None),
+                is_complete=is_complete,
             )
-        else:
-            draft.current_step = request.current_step
-            draft.content = request.content
-            draft.keywords = request.keywords
-            await draft.save()
+        # Move selected image from temp_images to images if needed
+        selected_image_id = getattr(request, "selected_image_id", None)
+        if selected_image_id:
+            import os, shutil
+            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+            images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+            temp_path = os.path.join(temp_dir, selected_image_id)
+            images_path = os.path.join(images_dir, selected_image_id)
+            if os.path.exists(temp_path) and not os.path.exists(images_path):
+                shutil.move(temp_path, images_path)
         return {"message": "Draft saved", "draft_id": draft.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving draft: {str(e)}")
@@ -399,7 +435,7 @@ async def generate_images(user_id: str = Form(...), content: str = Form(...)):
             image_id = await helper.generate_image(
                 business_idea=settings.business_idea,
                 brand_guidelines=settings.brand_guidelines,
-                extracted_file_text=settings.extracted_file_text or content
+                extracted_file_text=settings.brand_guidelines
             )
             images.append(image_id)
         return {"images": images}
@@ -456,9 +492,9 @@ async def generate_posts(request: GeneratePostsRequest):
         posts = []
         for i in range(3):
             post_text = await helper.generate_post(
-                business_idea=settings.business_idea,
+                business_idea=request.idea,
                 brand_guidelines=settings.brand_guidelines,
-                extracted_file_text=" ".join(request.keywords)
+                extracted_file_text=request.keywords
             )
             posts.append(post_text)
         # Save post options to draft
@@ -466,6 +502,7 @@ async def generate_posts(request: GeneratePostsRequest):
         if draft:
             draft.post_options = posts
             await draft.save()
+        print(f"Total Posts = {len(posts)}")
         return {"posts": posts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating posts: {str(e)}")
@@ -504,9 +541,8 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
         # Parallel image generation
         async def generate_and_move():
             image_id = await helper.generate_image(
-                business_idea=settings.business_idea,
                 brand_guidelines=settings.brand_guidelines,
-                extracted_file_text=request.post_text
+                post_text=request.post_text
             )
             src_path = os.path.join(images_dir, image_id)
             temp_path = os.path.join(temp_dir, image_id)
@@ -564,9 +600,17 @@ async def select_post(request: SelectPostRequest):
         images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
         temp_path = os.path.join(temp_dir, request.image_id)
         images_path = os.path.join(images_dir, request.image_id)
-        if os.path.exists(temp_path) and not os.path.exists(images_path):
-            shutil.move(temp_path, images_path)
-        print(f"[select_post] Selection saved: post_index={post_index}, image_id={request.image_id}")
+        print(f"[select_post] temp_path: {temp_path}, images_path: {images_path}")
+        print(f"[select_post] temp_path exists: {os.path.exists(temp_path)}, images_path exists: {os.path.exists(images_path)}")
+        try:
+            if os.path.exists(temp_path) and not os.path.exists(images_path):
+                shutil.move(temp_path, images_path)
+                print(f"[select_post] Image moved from temp_images to images: {request.image_id}")
+            else:
+                print(f"[select_post] Image not moved. temp_path exists: {os.path.exists(temp_path)}, images_path exists: {os.path.exists(images_path)}")
+        except Exception as move_err:
+            print(f"[select_post] Error moving image: {move_err}")
+        print(f"[select_post] Selection saved: post_index={post_index}, image_id={request.image_id}, draft.selected_image_id={draft.selected_image_id}")
         return {"message": "Selection saved"}
     except Exception as e:
         print(f"[select_post] Error: {e}")
@@ -589,28 +633,18 @@ async def edit_post(request: EditPostRequest):
         raise HTTPException(status_code=500, detail=f"Error editing post: {str(e)}")
 
 @router.post("/business-post/generate-idea")
-async def generate_idea(user_id: str = Form(...), user_text: Optional[str] = Form(None)):
+async def generate_idea(payload: GenerateIdeaPayload):
     try:
-  
-
-        settings = await PostSettings.filter(user_id=user_id).first()
+        settings = await PostSettings.filter(user_id=payload.user_id).first()
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
         helper = BusinessPostHelper()
-        # If user_text is provided, use it as the main input for idea generation
-        if user_text:
-            print(f"user send the data and want to rewrite {user_text}")
-            idea = await helper.generate_short_idea(
-                business_idea=user_text,
-                brand_guidelines=user_text,
-                extracted_file_text=user_text
-            )
-        else:
-            idea = await helper.generate_short_idea(
-                business_idea=settings.business_idea,
-                brand_guidelines=settings.brand_guidelines,
-                extracted_file_text=settings.extracted_file_text
-            )
+        print(f"User text = {payload.user_text}")
+        print(f"User ID = {payload.user_id}")
+        idea = await helper.generate_short_idea(
+            user_text=payload.user_text,
+        )
+        print(f"Idea = {idea}")
         return {"idea": idea}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating idea: {str(e)}")
@@ -702,4 +736,48 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"Error updating post: {str(e)}")
+
+# --- Super Admin Post Prompt Endpoints ---
+@router.get("/post-prompts")
+async def get_post_prompts():
+    prompt = await PostPromptSettings.first()
+    if not prompt:
+        return {
+            "post_prompt": "",
+            "idea_prompt": "",
+            "image_prompt": "",
+        }
+    return {
+        "post_prompt": prompt.post_prompt,
+        "idea_prompt": prompt.idea_prompt,
+        "image_prompt": prompt.image_prompt,
+    }
+
+@router.post("/post-prompts")
+async def update_post_prompts(data: dict):
+    prompt = await PostPromptSettings.first()
+    if not prompt:
+        prompt = await PostPromptSettings.create(
+            post_prompt=data.get("post_prompt"),
+            idea_prompt=data.get("idea_prompt"),
+            image_prompt=data.get("image_prompt"),
+        )
+    else:
+        prompt.post_prompt = data.get("post_prompt", prompt.post_prompt)
+        prompt.idea_prompt = data.get("idea_prompt", prompt.idea_prompt)
+        prompt.image_prompt = data.get("image_prompt", prompt.image_prompt)
+        await prompt.save()
+    return {
+        "post_prompt": prompt.post_prompt,
+        "idea_prompt": prompt.idea_prompt,
+        "image_prompt": prompt.image_prompt,
+    }
+
+@router.get("/post-prompts/defaults")
+async def get_post_prompt_defaults():
+    return {
+        "post_prompt": "",
+        "idea_prompt": "",
+        "image_prompt": "",
+    }
 
