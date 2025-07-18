@@ -35,6 +35,7 @@ class BusinessPostResponse(BaseModel):
     created_at: str
     title: Optional[str] = None
     image_id: Optional[str] = None
+    is_complete: Optional[bool] = None
 
 
 class PostSettingsResponse(BaseModel):
@@ -109,6 +110,8 @@ async def upsert_post_settings(request: PostSettingsRequest):
     try:
         existing = await PostSettings.filter(user_id=request.user_id).first()
         if existing:
+            print("Exist -------------")
+            print(request.brand_guidelines)
             existing.business_idea = request.business_idea
             existing.brand_guidelines = request.brand_guidelines
             existing.frequency = request.frequency
@@ -185,7 +188,8 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 post=post.post,
                 status=post.status,
                 created_at=post.created_at.isoformat(),
-                image_id=getattr(post, 'image_id', None)
+                image_id=getattr(post, 'image_id', None),
+                is_complete=False
             ) for post in posts
         ]
         for draft in drafts:
@@ -195,6 +199,7 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 post_text = draft.post_options[draft.selected_post_index]
             else:
                 post_text = draft.content
+                
             result.append({
                 "id": draft.id,
                 "post": post_text or "",
@@ -343,7 +348,7 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
         if business_idea:
             settings.business_idea = business_idea
         if brand_guidelines:
-            settings.brand_guidelines = brand_guidelines
+            settings.brand_guidelines = summary
         if summary:
             settings.extracted_file_text = summary
         await settings.save()
@@ -404,9 +409,12 @@ async def save_or_update_draft(request: DraftRequest):
         raise HTTPException(status_code=500, detail=f"Error saving draft: {str(e)}")
 
 @router.get("/business-post/draft/active")
-async def get_active_draft(user_id: str):
+async def get_active_draft(user_id: str, draft_id: int = None):
     try:
-        draft = await PostDraft.filter(user_id=user_id, is_complete=False).order_by('-updated_at').first()
+        if draft_id is not None:
+            draft = await PostDraft.filter(user_id=user_id, id=draft_id).first()
+        else:
+            draft = await PostDraft.filter(user_id=user_id, is_complete=False).order_by('-id').first()
         if not draft:
             return {"message": "No active draft found"}
         return {
@@ -417,7 +425,8 @@ async def get_active_draft(user_id: str):
             "post_options": draft.post_options,
             "selected_post_index": draft.selected_post_index,
             "image_ids": draft.image_ids,
-            "selected_image_id": draft.selected_image_id
+            "selected_image_id": draft.selected_image_id,
+            "is_completed": True
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching active draft: {str(e)}")
@@ -529,6 +538,7 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
 
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest):
+    # return [{"image_id":"png_skoid_475fd488-6c59-44a5-9aa9-31c4db451bea_sktid_a48cca56-e6da-484e-a814-9c849652bcb3_skt_2025-07-18T12_27_44Z_ske_2025-07-19T12_27_44Z_sks_b_skv_2024-08-04_sig_pOM3NJ9ywptoIB8ODajdLhizNf85qNUImL1SolV3ktc_.png","image_url":"/api/business-post/display-image/png_skoid_475fd488-6c59-44a5-9aa9-31c4db451bea_sktid_a48cca56-e6da-484e-a814-9c849652bcb3_skt_2025-07-18T12_27_44Z_ske_2025-07-19T12_27_44Z_sks_b_skv_2024-08-04_sig_pOM3NJ9ywptoIB8ODajdLhizNf85qNUImL1SolV3ktc_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""},{"image_id":"79Og0FzSQCSZ8_.png","image_url":"/api/business-post/display-image/79Og0FzSQCSZ8_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""},{"image_id":"aHmT0fFHtgqGL3jqiqPjQ_.png","image_url":"/api/business-post/display-image/aHmT0fFHtgqGL3jqiqPjQ_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""}]
     logging.warning(f"Request body: {request}")
     try:
         settings = await PostSettings.filter(user_id=request.user_id).first()
@@ -559,17 +569,17 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             for image_id in image_id_list
         ]
         # Save image_ids to draft (as temp reference)
-        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
-        if draft:
-            post_options = draft.post_options or []
-            try:
-                post_index = post_options.index(request.post_text)
-            except ValueError:
-                post_index = 0
-            draft_image_ids = draft.image_ids or [None, None, None]
-            draft_image_ids[post_index] = image_id_list  # Save all 3 image ids for this post index
-            draft.image_ids = draft_image_ids
-            await draft.save()
+        # draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
+        # if draft:
+        #     post_options = draft.post_options or []
+        #     try:
+        #         post_index = post_options.index(request.post_text)
+        #     except ValueError:
+        #         post_index = 0
+        #     draft_image_ids = draft.image_ids or [None, None, None]
+        #     draft_image_ids[post_index] = image_id_list  # Save all 3 image ids for this post index
+        #     draft.image_ids = draft_image_ids
+        #     await draft.save()
         logging.warning("Returning image generation response (3 images, parallel)")
         return {"images": image_objs}
     except Exception as e:
