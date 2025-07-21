@@ -15,6 +15,9 @@ import shutil
 import httpx
 import asyncio
 from models.post_prompt_settings import PostPromptSettings
+import re
+import json
+from io import BytesIO
 
 router = APIRouter()
 
@@ -50,6 +53,7 @@ class PostSettingsResponse(BaseModel):
     monthly_dates: Optional[list] = None
     uploaded_file: Optional[str] = None
     extracted_file_text: Optional[str] = None
+    reference_images: Optional[List[str]] = None
 
 
 class ApprovePostRequest(BaseModel):
@@ -105,6 +109,14 @@ class GenerateIdeaPayload(BaseModel):
 
 helper = BusinessPostHelper()
 
+def sanitize_filename(filename, max_length=100):
+    import re
+    filename = re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
+    if len(filename) > max_length:
+        name, ext = os.path.splitext(filename)
+        filename = name[:max_length-len(ext)] + ext
+    return filename
+
 @router.post("/post-settings", response_model=PostSettingsResponse)
 async def upsert_post_settings(request: PostSettingsRequest):
     try:
@@ -156,6 +168,25 @@ async def get_post_settings(user_id: int = Query(...)):
         if not settings:
             raise HTTPException(status_code=404, detail="Settings not found")
 
+        # Ensure reference_images is a list, not a string
+        reference_images = settings.reference_images
+        if isinstance(reference_images, str):
+            try:
+                reference_images = json.loads(reference_images)
+                print(f"[DEBUG] Parsed reference_images: {reference_images} (type: {type(reference_images)})")
+            except Exception as e:
+                print(f"[DEBUG] Error parsing reference_images: {e}")
+                reference_images = [None, None, None]
+        if not isinstance(reference_images, list):
+            print(f"[DEBUG] reference_images is not a list after parsing, setting to [None, None, None]")
+            reference_images = [None, None, None]
+        while len(reference_images) < 3:
+            reference_images.append(None)
+        reference_images = reference_images[:3]
+        # Convert all None to empty string for Pydantic
+        reference_images = [img if isinstance(img, str) else "" for img in reference_images]
+        print(f"[DEBUG] Final reference_images to return: {reference_images}")
+
         return PostSettingsResponse(
             id=settings.id,
             user_id=settings.user_id,
@@ -167,7 +198,8 @@ async def get_post_settings(user_id: int = Query(...)):
             weekly_days=getattr(settings, 'weekly_days', None),
             monthly_dates=getattr(settings, 'monthly_dates', None),
             uploaded_file=getattr(settings, 'uploaded_file', None),
-            extracted_file_text=getattr(settings, 'extracted_file_text', None)
+            extracted_file_text=getattr(settings, 'extracted_file_text', None),
+            reference_images=reference_images
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
@@ -223,19 +255,23 @@ def display_image_helper(image_id):
 @router.get('/display-image/{image_id}')
 def display_image(image_id: str, temp: int = 0):
     try:
+        print(f"Requested image_id: {image_id}")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         if temp:
-            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+            temp_dir = os.path.join(base_dir, '..', 'temp_images')
             image_path = os.path.join(temp_dir, image_id)
         else:
-            images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+            images_dir = os.path.join(base_dir, '..', 'images')
             image_path = os.path.join(images_dir, image_id)
+        if not os.path.exists(image_path):
+            ref_dir = os.path.join(base_dir, '..', 'reference_images')
+            ref_path = os.path.join(ref_dir, image_id)
+            print(f"Checking reference_images: {ref_path}")
+            if os.path.exists(ref_path):
+                image_path = ref_path
+        print(f"Serving image from: {image_path}")
         if os.path.exists(image_path):
             return FileResponse(path=image_path, media_type='image/png')
-        # Try with .jpg
-        if os.path.exists(image_path + '.jpg'):
-            return FileResponse(path=image_path + '.jpg', media_type='image/jpeg')
-        if os.path.exists(image_path + '.png'):
-            return FileResponse(path=image_path + '.png', media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
     except Exception as e:
         print(f"Error in display_image: {e}")
@@ -262,11 +298,19 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
 @router.post("/post-settings/upload-file")
 async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile = File(...)):
     try:
+        # Max file size in bytes (10 MB)
+        MAX_FILE_SIZE = 10 * 1024 * 1024
+        file_content = await file.read()
+        if len(file_content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 10 MB.")
+        # Reset file pointer for further reading
+        file.file = BytesIO(file_content)
+
         uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
         os.makedirs(uploads_dir, exist_ok=True)
         file_location = os.path.join(uploads_dir, file.filename)
         with open(file_location, "wb") as f:
-            f.write(await file.read())
+            f.write(file_content)
 
         business_idea = None
         brand_guidelines = None
@@ -312,10 +356,13 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
             LLM_API_KEY = os.getenv("OPENAI_API_KEY")
             prompt = (
                 "You are an expert in social media branding. "
-                "Given the following extracted content from a brand guidelines document, generate a comprehensive summary of the post guidelines. "
-                "The summary should describe how posts should look, including logo usage, color palette, typography, and any other visual or content rules. "
-                "Focus on actionable instructions for generating social media posts that match the brand's style.\n\n"
-                f"Extracted Content:\n{all_text}\n\nSummary:"
+                "Given the following extracted content from a brand guidelines document, do the following:\n"
+                "1. Extract the color palette as a list of hex color codes. For each color, specify if it is primary, secondary, accent, or other (if possible). Output each color on a new line in the format: <label>: <hex> (e.g., Primary: #FF5733). If the role is not clear, just output the hex code.\n"
+                "2. Write a clear, plain-text overview of the brand in no more than 50 words. Do not use tags or formatting.\n"
+                "Separate the two sections with the line '---'.\n"
+                "If no colors are found, leave the first section empty.\n\n"
+                f"Extracted Content:\n{all_text}\n\n"
+                "Colors:\n"
             )
             headers = {
                 "Authorization": f"Bearer {LLM_API_KEY}",
@@ -542,7 +589,6 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
 
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest):
-    # return [{"image_id":"png_skoid_475fd488-6c59-44a5-9aa9-31c4db451bea_sktid_a48cca56-e6da-484e-a814-9c849652bcb3_skt_2025-07-18T12_27_44Z_ske_2025-07-19T12_27_44Z_sks_b_skv_2024-08-04_sig_pOM3NJ9ywptoIB8ODajdLhizNf85qNUImL1SolV3ktc_.png","image_url":"/api/business-post/display-image/png_skoid_475fd488-6c59-44a5-9aa9-31c4db451bea_sktid_a48cca56-e6da-484e-a814-9c849652bcb3_skt_2025-07-18T12_27_44Z_ske_2025-07-19T12_27_44Z_sks_b_skv_2024-08-04_sig_pOM3NJ9ywptoIB8ODajdLhizNf85qNUImL1SolV3ktc_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""},{"image_id":"79Og0FzSQCSZ8_.png","image_url":"/api/business-post/display-image/79Og0FzSQCSZ8_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""},{"image_id":"aHmT0fFHtgqGL3jqiqPjQ_.png","image_url":"/api/business-post/display-image/aHmT0fFHtgqGL3jqiqPjQ_.png?temp=1","post_text":"\"Transform $500 into a magical scrub adventure! 🌟 Share your scrubby story with us! #ScrubbersUnite\""}]
     logging.warning(f"Request body: {request}")
     try:
         settings = await PostSettings.filter(user_id=request.user_id).first()
@@ -551,8 +597,22 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
         helper = BusinessPostHelper()
         images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
         temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-        os.makedirs(temp_dir, exist_ok=True)
+        # ref_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'reference_images')
+        # os.makedirs(temp_dir, exist_ok=True)
+        # Load reference images from PostSettings if present
+        # reference_images = []
+        # if settings.reference_images:
+        #     for filename in settings.reference_images:
+        #         if filename and isinstance(filename, str):  # Only process valid filenames
+        #             file_path = os.path.join(ref_dir, filename)
+        #             if os.path.exists(file_path):
+        #                 reference_images.append(file_path)
+        #                 # with open(file_path, "rb") as f:
+        #                 #     reference_images.append(f.read())
         # Parallel image generation
+        # mode = 'analyze' if reference_images else 'generate'
+        
+        
         async def generate_and_move():
             image_id = await helper.generate_image(
                 brand_guidelines=settings.brand_guidelines,
@@ -573,17 +633,17 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             for image_id in image_id_list
         ]
         # Save image_ids to draft (as temp reference)
-        # draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
-        # if draft:
-        #     post_options = draft.post_options or []
-        #     try:
-        #         post_index = post_options.index(request.post_text)
-        #     except ValueError:
-        #         post_index = 0
-        #     draft_image_ids = draft.image_ids or [None, None, None]
-        #     draft_image_ids[post_index] = image_id_list  # Save all 3 image ids for this post index
-        #     draft.image_ids = draft_image_ids
-        #     await draft.save()
+        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
+        if draft:
+            post_options = draft.post_options or []
+            try:
+                post_index = post_options.index(request.post_text)
+            except ValueError:
+                post_index = 0
+            draft_image_ids = draft.image_ids or [None, None, None]
+            draft_image_ids[post_index] = image_id_list  # Save all 3 image ids for this post index
+            draft.image_ids = draft_image_ids
+            await draft.save()
         logging.warning("Returning image generation response (3 images, parallel)")
         return {"images": image_objs}
     except Exception as e:
@@ -797,4 +857,34 @@ async def get_post_prompt_defaults():
         "idea_prompt": "",
         "image_prompt": "",
     }
+
+@router.post("/business-post/upload-reference-image")
+async def upload_reference_image(user_id: str = Form(...), slot: int = Form(...), file: UploadFile = File(...)):
+    import os
+    images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'reference_images'))
+    os.makedirs(images_dir, exist_ok=True)
+    def sanitize_filename(filename, max_length=100):
+        import re
+        filename = re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
+        if len(filename) > max_length:
+            name, ext = os.path.splitext(filename)
+            filename = name[:max_length-len(ext)] + ext
+        return filename
+    slot = max(1, min(3, int(slot)))  # Ensure slot is 1, 2, or 3
+    filename = sanitize_filename(f"ref_{user_id}_{slot}_{file.filename}")
+    file_path = os.path.join(images_dir, filename)
+    print(f"Saving reference image to: {file_path}")
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+    # Update the correct slot in PostSettings
+    settings = await PostSettings.filter(user_id=user_id).first()
+    if settings:
+        ref_images = settings.reference_images or [None, None, None]
+        # Ensure the list is always 3 elements
+        while len(ref_images) < 3:
+            ref_images.append(None)
+        ref_images[slot-1] = filename
+        settings.reference_images = ref_images
+        await settings.save()
+    return {"message": f"Reference image for slot {slot} uploaded", "filename": filename}
 

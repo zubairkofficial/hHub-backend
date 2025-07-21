@@ -12,6 +12,8 @@ from fastapi import HTTPException
 import time
 import traceback
 from models.post_prompt_settings import PostPromptSettings
+import base64
+import uuid, os, requests
 
 
 load_dotenv()
@@ -22,6 +24,11 @@ IMAGE_DIR = os.path.join(BASE_DIR, '..', 'images')
 def sanitize_filename(filename):
     # Replace forbidden characters with underscore
     return re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
+
+def encode_image(file_path):
+    with open(file_path, "rb") as f:
+        base64_image = base64.b64encode(f.read()).decode("utf-8")
+    return base64_image
 
 class BusinessPostHelper:
     def __init__(self):
@@ -100,41 +107,44 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, brand_guidelines: str, post_text: str) -> str:
+    async def generate_image(self, brand_guidelines: str, post_text: str, references=None, mode="generate") -> str:
         prompts = await self.get_dynamic_prompts()
-        prompt = prompts["image_prompt"]
-        prompt_parts = []
-        if brand_guidelines:
-            prompt_parts.append(f"Brand Guidelines: {brand_guidelines} \n")
-        
-        prompt_parts.append(f"Post Content: {post_text} \n")
-        image_prompt = prompt
-        max_retries = 3
-        image_prompt += "".join(prompt_parts)
-        for attempt in range(max_retries):
-            try:
-                response = self.client.images.generate(
-                    model="dall-e-3",
-                    prompt=image_prompt,
-                    size="1024x1024",
-                    quality="standard",
-                    n=1
-                )
-                if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
-                    image_url = self.save_image_from_url(response.data[0].url)
-                    print(f"[Image Generation] Image saved as images/{image_url}")
-                    return image_url
-                else:
-                    print(f"[Image Generation] No image URL returned. Response: {response}")
-                    return None
-            except Exception as e:
-                print(f"Error generating image (attempt {attempt+1}/{max_retries}): {str(e)}")
-                if attempt < max_retries - 1:
-                    time.sleep(2)  # Wait before retrying
-                else:
-                    import traceback
-                    traceback.print_exc()
-                    return None 
+        image_prompt = prompts["image_prompt"]
+        # Use the image_prompt as a dynamic template, filling in {post_text} and {brand_guidelines}
+        prompt = image_prompt.format(post_text=post_text, brand_guidelines=brand_guidelines)
+        response = self.client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            size="1024x1024",
+            quality="standard",
+            n=1
+        )
+        # Extract the image URL from the response
+        if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
+            image_url = response.data[0].url
+            # Download and save to temp_images with a unique image_id
+            image_id = f"{uuid.uuid4()}.png"
+            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+            os.makedirs(temp_dir, exist_ok=True)
+            temp_path = os.path.join(temp_dir, image_id)
+            img_data = requests.get(image_url).content
+            with open(temp_path, "wb") as handler:
+                handler.write(img_data)
+            return image_id  # Save this as the image_id in your DB/draft
+        else:
+            return None
+
+    def move_image_to_permanent(self, image_id):
+        import os
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
+        os.makedirs(images_dir, exist_ok=True)
+        src = os.path.join(temp_dir, image_id)
+        dst = os.path.join(images_dir, image_id)
+        if os.path.exists(src):
+            os.rename(src, dst)
+            return True
+        return False
 
     @staticmethod
     async def get_dynamic_prompts():

@@ -13,6 +13,7 @@ class PostSettings(models.Model):
     monthly_dates = fields.JSONField(null=True)  # e.g., ["2024-07-05", "2024-07-12"]
     uploaded_file = fields.CharField(max_length=255, null=True)  # Stores the uploaded file name or path
     extracted_file_text = fields.TextField(null=True)  # Stores all extracted text from uploaded file
+    reference_images = fields.JSONField(null=True)  # List of up to 3 reference image filenames for the user
 
     class Meta:
         table = "post_settings" 
