@@ -13,6 +13,7 @@ class PostDraft(models.Model):
     selected_image_id = fields.TextField(null=True) 
     is_complete = fields.BooleanField(default=False)
     created_at = fields.DatetimeField(auto_now_add=True)
+    posted_at = fields.DatetimeField(null=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:

@@ -207,7 +207,9 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 "created_at": draft.created_at.isoformat(),
                 "image_id": getattr(draft, 'selected_image_id', None),
                 "is_complete": draft.is_complete,
-                "current_step": draft.current_step
+                "current_step": draft.current_step,
+                "created_at": draft.created_at.isoformat() if draft.created_at else None,
+                "posted_at": draft.posted_at.isoformat() if draft.posted_at else None
             })
         result.sort(key=lambda x: x["created_at"] if isinstance(x, dict) else x.created_at, reverse=True)
         print(f"result of the send user posts {result}")
@@ -426,7 +428,9 @@ async def get_active_draft(user_id: str, draft_id: int = None):
             "selected_post_index": draft.selected_post_index,
             "image_ids": draft.image_ids,
             "selected_image_id": draft.selected_image_id,
-            "is_completed": True
+            "is_completed": True,
+            "created_at": draft.created_at.isoformat() if draft.created_at else None,
+            "posted_at": draft.posted_at.isoformat() if draft.posted_at else None
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching active draft: {str(e)}")
@@ -679,13 +683,16 @@ async def publish_post_from_draft(draft_id: int):
         )
         draft.is_complete = True
         draft.status = 'published'
+        from datetime import datetime
+        draft.posted_at = datetime.utcnow()
         await draft.save()
         return {
             "id": post.id,
             "post": post.post,
             "status": post.status,
             "created_at": post.created_at.isoformat(),
-            "image_id": post.image_id
+            "image_id": post.image_id,
+            "posted_at": draft.posted_at.isoformat() if draft.posted_at else None
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error publishing post: {str(e)}")
