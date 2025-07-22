@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, UploadFile, File, For
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from helper.business_post_helper import BusinessPostHelper
+from helper.extract_data_from_image import extract_data_from_img
 from models.post_settings import PostSettings
 from models.business_post import BusinessPost
 from typing import List, Optional, Any
@@ -18,6 +19,7 @@ from models.post_prompt_settings import PostPromptSettings
 import re
 import json
 from io import BytesIO
+from models.image_settings import ImageSettings
 
 router = APIRouter()
 
@@ -85,16 +87,16 @@ class GeneratePostsRequest(BaseModel):
 
 class GenerateImageForPostRequest(BaseModel):
     user_id: str
-    post_text: str
+    post_data: dict
 
 class SelectPostRequest(BaseModel):
     draft_id: int
-    post_text: str
+    post_data: dict
     image_id: str
 
 class EditPostRequest(BaseModel):
     draft_id: int
-    post_text: str
+    post_data: dict
 
 class BusinessPostUpdateRequest(BaseModel):
     post: Optional[str] = None
@@ -106,6 +108,19 @@ class GenerateIdeaPayload(BaseModel):
     user_id: str = Field(...)
     user_text: str = Field(...)
 
+class ImageSettingsRequest(BaseModel):
+    user_id: str = Field(...)
+    image_type: str
+    image_design: str
+    instruction: str = None
+
+class ImageSettingsResponse(BaseModel):
+    user_id: str
+    image_type: str
+    image_design: str
+    instruction: str = None
+    created_at: str
+    updated_at: str
 
 helper = BusinessPostHelper()
 
@@ -205,11 +220,12 @@ async def get_post_settings(user_id: int = Query(...)):
         raise HTTPException(status_code=500, detail=f"Error fetching post settings: {str(e)}")
 
 
-@router.get("/posts", response_model=List[BusinessPostResponse])
+@router.get("/posts")
 async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
     try:
         if user_id is not None:
             posts = await BusinessPost.filter(user_id=user_id).order_by('-created_at')
+            print(f"post get = {posts}")
             drafts = await PostDraft.filter(user_id=user_id).order_by('-created_at')
         else:
             posts = await BusinessPost.all().order_by('-created_at')
@@ -224,17 +240,18 @@ async def get_all_posts(user_id: Optional[int] = Query(None, description="User I
                 is_complete=False
             ) for post in posts
         ]
+        print(f"results get = {result}")
         for draft in drafts:
             draft = await PostDraft.get(id=draft.id)
-            post_text = None
+            post_data = None
             if draft.post_options and draft.selected_post_index is not None and 0 <= draft.selected_post_index < len(draft.post_options):
-                post_text = draft.post_options[draft.selected_post_index]
+                post_data = draft.post_options[draft.selected_post_index]
             else:
-                post_text = draft.content
+                post_data = draft.content
                 
             result.append({
                 "id": draft.id,
-                "post": post_text or "",
+                "post": post_data or "",
                 "status": "draft",
                 "created_at": draft.created_at.isoformat(),
                 "image_id": getattr(draft, 'selected_image_id', None),
@@ -296,14 +313,15 @@ async def get_post_by_id(post_id: int = Path(..., description="ID of the post to
 
 
 @router.post("/post-settings/upload-file")
-async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile = File(...)):
+async def upload_post_settings_file(file_type:str = "pdf", user_id: int = Query(...), file: UploadFile = File(...)):
     try:
-        # Max file size in bytes (10 MB)
+
         MAX_FILE_SIZE = 10 * 1024 * 1024
         file_content = await file.read()
+
         if len(file_content) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 10 MB.")
-        # Reset file pointer for further reading
+
         file.file = BytesIO(file_content)
 
         uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'uploads')
@@ -316,6 +334,8 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
         brand_guidelines = None
         all_text = None
         summary = None
+        file_name = file.filename.split(".")
+        extension = file_name[-1]
         # Extract data from the file
         if file.filename.endswith('.txt'):
             with open(file_location, "r", encoding="utf-8") as f:
@@ -350,8 +370,12 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
             except Exception as e:
                 print(f"DOCX extraction error: {e}")
 
-        # Generate summary using external LLM if all_text is available
-        if all_text:
+        if extension in ['png', 'jpeg', 'jpg']:
+            print(f"Extracting data from logo")
+            summary = await extract_data_from_img(path= file_location)
+            print(f"Summary of jpg = {summary}")
+        if all_text and extension not in ['png', 'jpeg', 'jpg']:
+            print("In All Text if statement")
             LLM_API_URL = "https://api.openai.com/v1/chat/completions"
             LLM_API_KEY = os.getenv("OPENAI_API_KEY")
             prompt = (
@@ -386,8 +410,6 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
             except Exception as e:
                 print(f"LLM summarization error: {e}")
                 summary = all_text  # fallback to raw text
-        else:
-            summary = None
 
         # Save the filename and extracted summary in the user's PostSettings
         settings = await PostSettings.filter(user_id=user_id).first()
@@ -396,17 +418,17 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
         settings.uploaded_file = file.filename
         if business_idea:
             settings.business_idea = business_idea
-        if brand_guidelines:
+        if summary:
             settings.brand_guidelines = summary
         if summary:
             settings.extracted_file_text = summary
         await settings.save()
 
-        print(summary)
+        print(f"summary outside function = {summary}")
         return {
             "filename": file.filename,
             "business_idea": business_idea,
-            "brand_guidelines": brand_guidelines,
+            "brand_guidelines": summary,
             "extracted_file_text": summary,
             "message": "File uploaded, data extracted, and summary generated successfully"
         }
@@ -416,6 +438,7 @@ async def upload_post_settings_file(user_id: int = Query(...), file: UploadFile 
 @router.post("/business-post/draft")
 async def save_or_update_draft(request: DraftRequest):
     try:
+        print("[DEBUG] Incoming DraftRequest:", request.dict())
         draft_id = getattr(request, "draft_id", None)
         is_complete = getattr(request, "is_complete", False)
         if draft_id:
@@ -423,19 +446,41 @@ async def save_or_update_draft(request: DraftRequest):
             if not draft:
                 raise HTTPException(status_code=404, detail="Draft not found")
             draft.current_step = request.current_step
-            draft.content = request.content
+            # Support dict or string for post_data
+            if isinstance(request.post_data, dict):
+                draft.content = request.post_data.get('content', '')
+                draft.title = request.post_data.get('title', '')
+                draft.description = request.post_data.get('description', '')
+
             draft.keywords = request.keywords
-            draft.post_options = getattr(request, "post_options", None)
+            # When saving/updating a draft, ensure post_options is a list of dicts with content, title, description
+            if hasattr(request, 'post_options') and request.post_options:
+                normalized_post_options = []
+                for opt in request.post_options:
+                    if isinstance(opt, dict):
+                        normalized_post_options.append({
+                            'content': opt.get('content', ''),
+                            'title': opt.get('title', ''),
+                            'description': opt.get('description', '')
+                        })
+                    else:
+                        normalized_post_options.append({'content': str(opt), 'title': '', 'description': ''})
+                draft.post_options = normalized_post_options
+            else:
+                draft.post_options = None
             draft.selected_post_index = getattr(request, "selected_post_index", None)
             draft.image_ids = getattr(request, "image_ids", None)
             draft.selected_image_id = getattr(request, "selected_image_id", None)
             draft.is_complete = is_complete
             await draft.save()
+            print("[DEBUG] Saved Draft:", draft.__dict__)
         else:
             draft = await PostDraft.create(
                 user_id=request.user_id,
                 current_step=request.current_step,
                 content=request.content,
+                title=request.title if hasattr(request, 'title') else None,
+                description=request.description if hasattr(request, 'description') else None,
                 keywords=request.keywords,
                 post_options=getattr(request, "post_options", None),
                 selected_post_index=getattr(request, "selected_post_index", None),
@@ -443,6 +488,7 @@ async def save_or_update_draft(request: DraftRequest):
                 selected_image_id=getattr(request, "selected_image_id", None),
                 is_complete=is_complete,
             )
+            print("[DEBUG] Created Draft:", draft.__dict__)
         # Move selected image from temp_images to images if needed
         selected_image_id = getattr(request, "selected_image_id", None)
         if selected_image_id:
@@ -544,26 +590,37 @@ async def save_selected_image(request: ImageSelectionRequest):
 
 @router.post("/business-post/generate-posts")
 async def generate_posts(request: GeneratePostsRequest):
+
     try:
         helper = BusinessPostHelper()
         settings = await PostSettings.filter(user_id=request.user_id).first()
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
-        posts = []
+        post_bundles = []
         for i in range(3):
-            post_text = await helper.generate_post(
+            bundle = await helper.generate_post_bundle(
                 business_idea=request.idea,
-                brand_guidelines=settings.brand_guidelines,
-                extracted_file_text=request.keywords
+                keywords=request.keywords  # Use actual keywords
             )
-            posts.append(post_text)
-        # Save post options to draft
+            post_bundles.append(bundle)
+   
+        # Save post options and keywords to draft
         draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
         if draft:
-            draft.post_options = posts
+            draft.post_options = post_bundles
+            # Ensure keywords is always a list for JSONField
+            import json
+            try:
+                parsed_keywords = json.loads(request.keywords)
+                if not isinstance(parsed_keywords, (list, dict)):
+                    parsed_keywords = [parsed_keywords]
+            except Exception:
+                parsed_keywords = [request.keywords]
+            draft.keywords = parsed_keywords
             await draft.save()
-        print(f"Total Posts = {len(posts)}")
-        return {"posts": posts}
+        print(f"Total Posts = {post_bundles}")
+        
+        return {"posts": post_bundles}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating posts: {str(e)}")
 
@@ -589,62 +646,134 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
 
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest):
+    import re
     logging.warning(f"Request body: {request}")
     try:
+        # Fetch settings
         settings = await PostSettings.filter(user_id=request.user_id).first()
+        image_settings = await ImageSettings.filter(user_id=request.user_id).first()
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
         helper = BusinessPostHelper()
         images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
         temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-        # ref_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'reference_images')
-        # os.makedirs(temp_dir, exist_ok=True)
-        # Load reference images from PostSettings if present
-        # reference_images = []
-        # if settings.reference_images:
-        #     for filename in settings.reference_images:
-        #         if filename and isinstance(filename, str):  # Only process valid filenames
-        #             file_path = os.path.join(ref_dir, filename)
-        #             if os.path.exists(file_path):
-        #                 reference_images.append(file_path)
-        #                 # with open(file_path, "rb") as f:
-        #                 #     reference_images.append(f.read())
-        # Parallel image generation
-        # mode = 'analyze' if reference_images else 'generate'
-        
-        
-        async def generate_and_move():
+
+        # Extract color code from brand_guidelines (e.g., #AABBCC)
+        color_code = None
+        overview = None
+        if settings.brand_guidelines:
+            match = re.search(r"#(?:[0-9a-fA-F]{3}){1,2}", settings.brand_guidelines)
+            if match:
+                color_code = match.group(0)
+            # Extract overview if present (e.g., 'Overview: ...')
+            overview_match = re.search(r"Overview[:\-\s]+(.+)", settings.brand_guidelines, re.IGNORECASE)
+            if overview_match:
+                overview = overview_match.group(1).strip()
+
+        # Use image_settings if available, else fallback to request or empty string
+        image_type = image_settings.image_type if image_settings and image_settings.image_type else getattr(request, 'image_type', '')
+        image_design = image_settings.image_design if image_settings and image_settings.image_design else getattr(request, 'image_design', '')
+        instruction = image_settings.instruction if image_settings and image_settings.instruction else getattr(request, 'instruction', '')
+
+        # Fetch post data (simulate, you may need to fetch from DB if not in request)
+        post_title = request.post_data.get('title', '') if hasattr(request, 'post_data') else ''
+        post_description = request.post_data.get('description', '') if hasattr(request, 'post_data') else ''
+        post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') else ''
+        brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
+
+        # Print all data being passed
+        print("[IMAGE GEN DEBUG] user_id:", request.user_id)
+        print("[IMAGE GEN DEBUG] post_data:", request.post_data)
+        print("[IMAGE GEN DEBUG] image_type:", image_type)
+        print("[IMAGE GEN DEBUG] image_design:", image_design)
+        print("[IMAGE GEN DEBUG] instruction:", instruction)
+        print("[IMAGE GEN DEBUG] brand_guidelines:", brand_guidelines)
+        print("[IMAGE GEN DEBUG] color_code:", color_code)
+        print("[IMAGE GEN DEBUG] overview:", overview)
+
+        # Compose prompt
+        def build_prompt(idx):
+            prompt = f"""
+### Instructions for Image Generation
+
+1. **Image Type** (`{image_type}`): 
+   - This specifies the style of the image you want to create. Choose from styles like \"realistic\", \"cartoon\", \"minimalistic\", \"abstract\", etc.
+   - Example: `\"cartoon\"` or `\"realistic\"`.
+
+2. **Image Design** (`{image_design}`): 
+   - This defines whether you want the image to be graphic-only, text-only, or a combination of both.
+   - Options:
+     - `\"image_only\"`: No text on the image, just graphics.
+     - `\"text_only\"`: The image will contain only text (such as a post title and description).
+     - `\"both\"`: A combination of text and graphics will appear on the image.
+   - Example: `\"both\"` if you want both text and graphic elements.
+
+3. **Overview** (`{overview}`): 
+   - This is a brief description of the visual style or theme you want for the image. Provide the context or mood you want to convey.
+   - Example: `\"Bright and engaging design to attract attention.\"` or `\"Elegant, minimalistic look for a professional feel.\"`
+   - This is optional and can be left blank if you have no specific overview.
+
+4. **Instructions** (`{instruction}`): 
+   - These are specific instructions on how the image should look or feel. This can include things like mood, tone, font style, and general design direction.
+   - Example: `\"The design should be eye-catching, with vibrant colors and minimal text.\"`
+
+5. **Brand Guidelines** (`{brand_guidelines}`): 
+   - This is where you specify any brand-specific design elements, such as color schemes. 
+   - Example: `\"Use the brand’s primary colors in the background and accents.\"` or `\"Ensure the design feels professional and minimalist, following brand color guidelines.\"`
+   .
+
+6. **Post Title** (`{post_title}`): 
+   - The main title of the post that will be featured on the image.
+   - Example: `\"Elevate Your Smile!\"` or `\"Get a Spectacular Smile!\"`.
+
+7. **Post Description** (`{post_description}`): 
+   - This is a short description or subtitle that goes under the title, providing additional context.
+   - Example: `\"Achieve the perfect smile with our advanced orthodontic services.\"`
+
+8. **Post Content** (`{post_content}`): 
+   - The main content or body text of the post. This can include more detailed information about your service, product, or offering.
+   - Example: `\"Book a consultation today to start your smile transformation!\"`
+
+9. **Image Number** (`{idx+1}`): 
+   - This will automatically be replaced with the image number when generating multiple images. For example, if you are generating the second image in a batch, this will show `2 of 3`.
+   - Example: `\"Image Number: 1 of 3\"` for the first image in a set of 3 images.
+"""
+            print(f"[IMAGE GEN DEBUG] Prompt for image {idx+1}:\n{prompt}")
+            return prompt
+
+        image_objs = []
+        for idx in range(3):
+            prompt = build_prompt(idx)
             image_id = await helper.generate_image(
-                brand_guidelines=settings.brand_guidelines,
-                post_text=request.post_text
+                brand_guidelines=brand_guidelines,
+                post_data=request.post_data,
+                references=None,
+                mode="generate",
+                prompt_override=prompt
             )
             src_path = os.path.join(images_dir, image_id)
             temp_path = os.path.join(temp_dir, image_id)
             if os.path.exists(src_path):
                 os.rename(src_path, temp_path)
-            return image_id
-        image_id_list = await asyncio.gather(*[generate_and_move() for _ in range(3)])
-        image_objs = [
-            {
+            image_objs.append({
                 "image_id": image_id,
                 "image_url": f"/api/business-post/display-image/{image_id}?temp=1",
-                "post_text": request.post_text
-            }
-            for image_id in image_id_list
-        ]
+                "post_text": post_content,
+                "prompt": prompt
+            })
         # Save image_ids to draft (as temp reference)
         draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
         if draft:
             post_options = draft.post_options or []
             try:
-                post_index = post_options.index(request.post_text)
+                post_index = post_options.index(post_content)
             except ValueError:
                 post_index = 0
             draft_image_ids = draft.image_ids or [None, None, None]
-            draft_image_ids[post_index] = image_id_list  # Save all 3 image ids for this post index
+            draft_image_ids[post_index] = [img["image_id"] for img in image_objs]
             draft.image_ids = draft_image_ids
             await draft.save()
-        logging.warning("Returning image generation response (3 images, parallel)")
+        logging.warning("Returning image generation response (3 images, sequential)")
         return {"images": image_objs}
     except Exception as e:
         logging.error(f"Error in image generation: {e}")
@@ -661,7 +790,7 @@ async def select_post(request: SelectPostRequest):
             raise HTTPException(status_code=404, detail="Draft not found")
         # Save selected post and image
         if draft.post_options and request.post_text in draft.post_options:
-            post_index = draft.post_options.index(request.post_text)
+            post_index = draft.post_options.index(request.post_data)
         else:
             print(f"[select_post] post_text not found in post_options. post_text: {request.post_text}, post_options: {draft.post_options}")
             post_index = 0
@@ -698,9 +827,7 @@ async def edit_post(request: EditPostRequest):
             raise HTTPException(status_code=404, detail="Draft not found")
         # Edit the selected post content
         if draft.post_options and draft.selected_post_index is not None:
-            draft.post_options[draft.selected_post_index] = request.post_text
-        else:
-            draft.content = request.post_text
+            draft.post_options[draft.selected_post_index] = request.post_data
         await draft.save()
         return {"message": "Post content updated"}
     except Exception as e:
@@ -718,6 +845,9 @@ async def generate_idea(payload: GenerateIdeaPayload):
         idea = await helper.generate_short_idea(
             user_text=payload.user_text,
         )
+        settings.business_idea = idea
+
+        await settings.save()
         print(f"Idea = {idea}")
         return {"idea": idea}
     except Exception as e:
@@ -858,33 +988,82 @@ async def get_post_prompt_defaults():
         "image_prompt": "",
     }
 
-@router.post("/business-post/upload-reference-image")
-async def upload_reference_image(user_id: str = Form(...), slot: int = Form(...), file: UploadFile = File(...)):
-    import os
-    images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'reference_images'))
-    os.makedirs(images_dir, exist_ok=True)
-    def sanitize_filename(filename, max_length=100):
-        import re
-        filename = re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
-        if len(filename) > max_length:
-            name, ext = os.path.splitext(filename)
-            filename = name[:max_length-len(ext)] + ext
-        return filename
-    slot = max(1, min(3, int(slot)))  # Ensure slot is 1, 2, or 3
-    filename = sanitize_filename(f"ref_{user_id}_{slot}_{file.filename}")
-    file_path = os.path.join(images_dir, filename)
-    print(f"Saving reference image to: {file_path}")
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-    # Update the correct slot in PostSettings
-    settings = await PostSettings.filter(user_id=user_id).first()
-    if settings:
-        ref_images = settings.reference_images or [None, None, None]
-        # Ensure the list is always 3 elements
-        while len(ref_images) < 3:
-            ref_images.append(None)
-        ref_images[slot-1] = filename
-        settings.reference_images = ref_images
-        await settings.save()
-    return {"message": f"Reference image for slot {slot} uploaded", "filename": filename}
+
+
+@router.post("/post-settings/image-options")
+async def upsert_image_settings(request: ImageSettingsRequest):
+    print("data = {request}")
+    try:
+        existing = await ImageSettings.filter(user_id=request.user_id).first()
+        if existing:
+            existing.image_type = request.image_type
+            existing.image_design = request.image_design
+            existing.instruction = request.instruction
+            await existing.save()
+            settings = existing
+        else:
+            settings = await ImageSettings.create(
+                user_id=request.user_id,
+                image_type=request.image_type,
+                image_design=request.image_design,
+                instruction=request.instruction
+            )
+        return ImageSettingsResponse(
+            user_id=settings.user_id,
+            image_type=settings.image_type,
+            image_design=settings.image_design,
+            instruction=settings.instruction,
+            created_at=settings.created_at.isoformat(),
+            updated_at=settings.updated_at.isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error upserting image settings: {str(e)}")
+
+@router.get("/post-settings/image-options", response_model=ImageSettingsResponse)
+async def get_image_settings(user_id: str = Query(...)):
+    try:
+        settings = await ImageSettings.filter(user_id=user_id).first()
+        if not settings:
+            raise HTTPException(status_code=404, detail="Image settings not found")
+        return ImageSettingsResponse(
+            user_id=settings.user_id,
+            image_type=settings.image_type,
+            image_design=settings.image_design,
+            instruction=settings.instruction,
+            created_at=settings.created_at.isoformat(),
+            updated_at=settings.updated_at.isoformat()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching image settings: {str(e)}")
+
+
+# @router.post("/business-post/upload-reference-image")
+# async def upload_reference_image(user_id: str = Form(...), slot: int = Form(...), file: UploadFile = File(...)):
+#     import os
+#     images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'reference_images'))
+#     os.makedirs(images_dir, exist_ok=True)
+#     def sanitize_filename(filename, max_length=100):
+#         import re
+#         filename = re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
+#         if len(filename) > max_length:
+#             name, ext = os.path.splitext(filename)
+#             filename = name[:max_length-len(ext)] + ext
+#         return filename
+#     slot = max(1, min(3, int(slot)))  # Ensure slot is 1, 2, or 3
+#     filename = sanitize_filename(f"ref_{user_id}_{slot}_{file.filename}")
+#     file_path = os.path.join(images_dir, filename)
+#     print(f"Saving reference image to: {file_path}")
+#     with open(file_path, "wb") as f:
+#         f.write(await file.read())
+#     # Update the correct slot in PostSettings
+#     settings = await PostSettings.filter(user_id=user_id).first()
+#     if settings:
+#         ref_images = settings.reference_images or [None, None, None]
+#         # Ensure the list is always 3 elements
+#         while len(ref_images) < 3:
+#             ref_images.append(None)
+#         ref_images[slot-1] = filename
+#         settings.reference_images = ref_images
+#         await settings.save()
+#     return {"message": f"Reference image for slot {slot} uploaded", "filename": filename}
 

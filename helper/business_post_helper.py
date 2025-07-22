@@ -12,7 +12,10 @@ from fastapi import HTTPException
 import time
 import traceback
 from models.post_prompt_settings import PostPromptSettings
+from pydantic import BaseModel, Field
 import base64
+import json
+import re
 import uuid, os, requests
 
 
@@ -20,6 +23,12 @@ load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 IMAGE_DIR = os.path.join(BASE_DIR, '..', 'images')
+
+
+class PostContent(BaseModel):
+    content: str = Field(description="Content of the post, max of 10 words")
+    title: str = Field(description="Title of the Post, max of 4 words")
+    description: str = Field(description="Description of the Post, max of 7 words")
 
 def sanitize_filename(filename):
     # Replace forbidden characters with underscore
@@ -70,6 +79,66 @@ class BusinessPostHelper:
         response = await self.llm.ainvoke(formatted_prompt)
         return response.content
 
+    async def generate_post_bundle(self, business_idea: str, keywords: str = None) -> dict:
+        # Use the dynamic idea_prompt from settings/admin
+        llm_model = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=1.2,
+            api_key=os.getenv("OPENAI_API_KEY")
+        ).with_structured_output(PostContent)
+        
+        prompts = await self.get_dynamic_prompts()
+        idea_prompt = prompts["post_prompt"]
+        prompt = idea_prompt.format(business_idea=business_idea, keywords=keywords)
+        response = await llm_model.ainvoke(prompt)
+        response = response.model_dump()
+
+        return response
+        def extract_json_from_llm_response(response_text):
+            # This will match ```json ... ``` or ``` ... ```
+            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_text)
+            if match:
+                response_text = match.group(1)
+            # Try to extract the first JSON object if extra text is present
+            json_match = re.search(r"\{[\s\S]*\}", response_text)
+            if json_match:
+                return json_match.group(0)
+            return response_text
+        try:
+            cleaned = extract_json_from_llm_response(response.content.strip())
+            print(f"[DEBUG] Cleaned LLM response before json.loads: {cleaned}")
+            if not cleaned or not cleaned.strip():
+                print("[DEBUG] Cleaned response is empty or whitespace.")
+                return {
+                    "title": "",
+                    "description": "",
+                    "content": response.content.strip()
+                }
+            cleaned = cleaned.strip()
+            if not (cleaned.startswith('{') and cleaned.endswith('}')):
+                print("[DEBUG] Cleaned response does not look like a JSON object.")
+                return {
+                    "title": "",
+                    "description": "",
+                    "content": cleaned
+                }
+            result = json.loads(cleaned)
+            return {
+                "title": result.get("title", ""),
+                "description": result.get("description", ""),
+                "content": result.get("content", "")
+            }
+        except Exception as e:
+            import traceback
+            print(f"LLM response parsing error: {e}, raw response: {response.content.strip()}")
+            print(f"[DEBUG] Cleaned response that failed: {cleaned}")
+            traceback.print_exc()
+            return {
+                "title": "",
+                "description": "",
+                "content": cleaned
+            }
+
     @staticmethod
     def save_image_from_url(image_url, filename=None):
         import requests
@@ -107,11 +176,13 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, brand_guidelines: str, post_text: str, references=None, mode="generate") -> str:
-        prompts = await self.get_dynamic_prompts()
-        image_prompt = prompts["image_prompt"]
-        # Use the image_prompt as a dynamic template, filling in {post_text} and {brand_guidelines}
-        prompt = image_prompt.format(post_text=post_text, brand_guidelines=brand_guidelines)
+    async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None) -> str:
+        # Only use prompt_override; do not use dynamic prompt templates
+        if prompt_override:
+            prompt = prompt_override
+        else:
+            # If no prompt_override is provided, do not generate an image
+            raise ValueError("A prompt_override must be provided for image generation.")
         response = self.client.images.generate(
             model="dall-e-3",
             prompt=prompt,

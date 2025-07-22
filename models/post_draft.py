@@ -5,6 +5,8 @@ class PostDraft(models.Model):
     user_id = fields.CharField(max_length=100)
     current_step = fields.IntField(default=1) 
     content = fields.TextField(null=True)
+    title = fields.CharField(max_length=255, null=True)
+    description = fields.TextField(null=True)
     keywords = fields.JSONField(null=True)    
     post_options = fields.JSONField(null=True) 
     selected_post_index = fields.IntField(null=True) 
