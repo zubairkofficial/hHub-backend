@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
+from helper.fall_ai import fall_ai_image_generator
 from openai import OpenAI
 import json
 import requests
@@ -183,17 +184,29 @@ class BusinessPostHelper:
         else:
             # If no prompt_override is provided, do not generate an image
             raise ValueError("A prompt_override must be provided for image generation.")
-        response = self.client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1
-        )
+        response = fall_ai_image_generator(prompt)
+        image_url = response
+        image_id = f"{uuid.uuid4()}.png"
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        os.makedirs(temp_dir, exist_ok=True)
+        temp_path = os.path.join(temp_dir, image_id)
+        img_data = requests.get(image_url).content
+        with open(temp_path, "wb") as handler:
+            handler.write(img_data)
+        return image_id  # Save this as the image_id in your DB/draft
+
+        # response = self.client.images.generate(
+        #     model="dall-e-3",
+        #     prompt=prompt,
+        #     size="1024x1024",
+        #     quality="standard",
+        #     n=1
+        # )
         # Extract the image URL from the response
+        print(f"Image Response = {response}")
+        return response
         if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
             image_url = response.data[0].url
-            # Download and save to temp_images with a unique image_id
             image_id = f"{uuid.uuid4()}.png"
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
             os.makedirs(temp_dir, exist_ok=True)

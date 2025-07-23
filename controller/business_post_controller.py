@@ -68,6 +68,7 @@ class DraftRequest(BaseModel):
     keywords: Optional[list] = None
     post_options: Optional[list] = None
     selected_post_index: Optional[int] = None
+    post_data: Optional[dict] = None
     image_id: Optional[str] = None
     image_ids: Optional[list] = None
     selected_image_id: Optional[str] = None
@@ -438,21 +439,29 @@ async def upload_post_settings_file(file_type:str = "pdf", user_id: int = Query(
 @router.post("/business-post/draft")
 async def save_or_update_draft(request: DraftRequest):
     try:
-        print("[DEBUG] Incoming DraftRequest:", request.dict())
+   
         draft_id = getattr(request, "draft_id", None)
         is_complete = getattr(request, "is_complete", False)
+        print('frist step')
         if draft_id:
             draft = await PostDraft.get(id=draft_id)
+            print('second step')
             if not draft:
                 raise HTTPException(status_code=404, detail="Draft not found")
+            print('third step')
+            
             draft.current_step = request.current_step
+            print('4th step')
             # Support dict or string for post_data
-            if isinstance(request.post_data, dict):
+            if request.post_data:
+                print('request.post_data start')
+              
                 draft.content = request.post_data.get('content', '')
                 draft.title = request.post_data.get('title', '')
                 draft.description = request.post_data.get('description', '')
-
+                print('request.post_data end')
             draft.keywords = request.keywords
+            print(f"draf keywords = {draft.keywords}")
             # When saving/updating a draft, ensure post_options is a list of dicts with content, title, description
             if hasattr(request, 'post_options') and request.post_options:
                 normalized_post_options = []
@@ -465,13 +474,17 @@ async def save_or_update_draft(request: DraftRequest):
                         })
                     else:
                         normalized_post_options.append({'content': str(opt), 'title': '', 'description': ''})
+                print("[DEBUG] Normalized post_options:", normalized_post_options)
                 draft.post_options = normalized_post_options
             else:
                 draft.post_options = None
+            print('after else')
             draft.selected_post_index = getattr(request, "selected_post_index", None)
             draft.image_ids = getattr(request, "image_ids", None)
+            print("[DEBUG] image_ids before save:", draft.image_ids)
             draft.selected_image_id = getattr(request, "selected_image_id", None)
             draft.is_complete = is_complete
+            print("[DEBUG] Draft object before save:", draft.__dict__)
             await draft.save()
             print("[DEBUG] Saved Draft:", draft.__dict__)
         else:
@@ -501,6 +514,7 @@ async def save_or_update_draft(request: DraftRequest):
                 shutil.move(temp_path, images_path)
         return {"message": "Draft saved", "draft_id": draft.id}
     except Exception as e:
+        print("[DEBUG] Error saving draft:", str(e))
         raise HTTPException(status_code=500, detail=f"Error saving draft: {str(e)}")
 
 @router.get("/business-post/draft/active")
@@ -693,51 +707,50 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
 
         # Compose prompt
         def build_prompt(idx):
-            prompt = f"""
-### Instructions for Image Generation
+            if image_type == "text_only":
+                prompt = f"""Create a social media post image.
+                CONTENT: 
+                Headline: "{post_title}"  
+                Subtext: "{post_description}"
 
-1. **Image Type** (`{image_type}`): 
-   - This specifies the style of the image you want to create. Choose from styles like \"realistic\", \"cartoon\", \"minimalistic\", \"abstract\", etc.
-   - Example: `\"cartoon\"` or `\"realistic\"`.
+                Style: Image should contain {image_type} and it should be {image_design}
+                Design: Image should be  {image_design}
+                COLORS: Extract colors and use them to generate Image =  ({brand_guidelines})
+                Instruction: \n  ({instruction})  
 
-2. **Image Design** (`{image_design}`): 
-   - This defines whether you want the image to be graphic-only, text-only, or a combination of both.
-   - Options:
-     - `\"image_only\"`: No text on the image, just graphics.
-     - `\"text_only\"`: The image will contain only text (such as a post title and description).
-     - `\"both\"`: A combination of text and graphics will appear on the image.
-   - Example: `\"both\"` if you want both text and graphic elements.
+                NOTE: THE IMAGE WILL HAVE ONLY TITLE OR SOMETIME DESCRIPTIONS
+                """
 
-3. **Overview** (`{overview}`): 
-   - This is a brief description of the visual style or theme you want for the image. Provide the context or mood you want to convey.
-   - Example: `\"Bright and engaging design to attract attention.\"` or `\"Elegant, minimalistic look for a professional feel.\"`
-   - This is optional and can be left blank if you have no specific overview.
+            elif image_type == "image_only":
+                prompt = f"""Create a graphics-only social media post design.
+                STYLE: {image_design} visual illustration
+                COLORS: Apply {brand_guidelines.split('Primary:')[1].split()[0] if 'Primary:' in brand_guidelines else '#000000'} color scheme
+                CONTENT: Visual graphics representing orthodontic/dental care theme
+                REQUIREMENTS:
+                - No text anywhere
+                - No letters or numbers
+                - Pure visual design
+                - {instruction}
 
-4. **Instructions** (`{instruction}`): 
-   - These are specific instructions on how the image should look or feel. This can include things like mood, tone, font style, and general design direction.
-   - Example: `\"The design should be eye-catching, with vibrant colors and minimal text.\"`
+                NOTE: THE IMAGE SHOULD FOCUS ON CONTENT = ({post_content} )
 
-5. **Brand Guidelines** (`{brand_guidelines}`): 
-   - This is where you specify any brand-specific design elements, such as color schemes. 
-   - Example: `\"Use the brand’s primary colors in the background and accents.\"` or `\"Ensure the design feels professional and minimalist, following brand color guidelines.\"`
-   .
+                NO color codes visible in image."""
 
-6. **Post Title** (`{post_title}`): 
-   - The main title of the post that will be featured on the image.
-   - Example: `\"Elevate Your Smile!\"` or `\"Get a Spectacular Smile!\"`.
+            else:  # both
+                prompt = f"""Create a social media post combining text and graphics.
 
-7. **Post Description** (`{post_description}`): 
-   - This is a short description or subtitle that goes under the title, providing additional context.
-   - Example: `\"Achieve the perfect smile with our advanced orthodontic services.\"`
+                TEXT: "{post_title}" and "{post_description}"
+                GRAPHICS: {image_design} style illustrations
+                COLORS: Apply {brand_guidelines.split('Primary:')[1].split()[0] if 'Primary:' in brand_guidelines else '#000000'} color scheme for the background design
+                LAYOUT: Balanced text and visual elements
+                REQUIREMENTS:
+                - Clear, readable text
+                - Complementary graphics that align with the text
+                - Professional design that integrates both elements effectively
+                - {instruction}
 
-8. **Post Content** (`{post_content}`): 
-   - The main content or body text of the post. This can include more detailed information about your service, product, or offering.
-   - Example: `\"Book a consultation today to start your smile transformation!\"`
+                NO color codes visible in the image; use colors only for the background design."""
 
-9. **Image Number** (`{idx+1}`): 
-   - This will automatically be replaced with the image number when generating multiple images. For example, if you are generating the second image in a batch, this will show `2 of 3`.
-   - Example: `\"Image Number: 1 of 3\"` for the first image in a set of 3 images.
-"""
             print(f"[IMAGE GEN DEBUG] Prompt for image {idx+1}:\n{prompt}")
             return prompt
 
