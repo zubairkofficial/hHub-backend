@@ -659,7 +659,7 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
 @router.post("/business-post/generate-image-for-post")
-async def generate_image_for_post(request: GenerateImageForPostRequest):
+async def generate_image_for_post(request: GenerateImageForPostRequest, image_no: int = Query(0)):
     import re
     logging.warning(f"Request body: {request}")
     try:
@@ -695,86 +695,75 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
         post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') else ''
         brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
 
-        # Print all data being passed
-        print("[IMAGE GEN DEBUG] user_id:", request.user_id)
-        print("[IMAGE GEN DEBUG] post_data:", request.post_data)
-        print("[IMAGE GEN DEBUG] image_type:", image_type)
-        print("[IMAGE GEN DEBUG] image_design:", image_design)
-        print("[IMAGE GEN DEBUG] instruction:", instruction)
-        print("[IMAGE GEN DEBUG] brand_guidelines:", brand_guidelines)
-        print("[IMAGE GEN DEBUG] color_code:", color_code)
-        print("[IMAGE GEN DEBUG] overview:", overview)
-
-        # Compose prompt
         def build_prompt(idx):
+    
             if image_type == "text_only":
-                prompt = f"""Create a social media post image.
-                CONTENT: 
-                Headline: "{post_title}"  
-                Subtext: "{post_description}"
+                prompt = f"""Social media post: TEXT ONLY
+            Title: "{post_title}"
+            Description: "{post_description}"
+            Style: Create a {image_design} aesthetic with professional typography and layout design
 
-                Style: Image should contain {image_type} and it should be {image_design}
-                Design: Image should be  {image_design}
-                COLORS: Extract colors and use them to generate Image =  ({brand_guidelines})
-                Instruction: \n  ({instruction})  
-
-                NOTE: THE IMAGE WILL HAVE ONLY TITLE OR SOMETIME DESCRIPTIONS
-                """
-
+            Requirements:
+            - Focus entirely on typography and text presentation
+            - NO graphics, illustrations, icons, or visual elements
+            - Use creative text layouts, fonts, and typographic hierarchy
+            - Apply color schemes to backgrounds, text, and design elements
+            - Ensure text is the sole visual communication method
+            Instructions: {instruction}"""
+                
             elif image_type == "image_only":
-                prompt = f"""Create a graphics-only social media post design.
-                STYLE: {image_design} visual illustration
-                COLORS: Apply {brand_guidelines.split('Primary:')[1].split()[0] if 'Primary:' in brand_guidelines else '#000000'} color scheme
-                CONTENT: Visual graphics representing orthodontic/dental care theme
-                REQUIREMENTS:
-                - No text anywhere
-                - No letters or numbers
-                - Pure visual design
-                - {instruction}
-
-                NOTE: THE IMAGE SHOULD FOCUS ON CONTENT = ({post_content} )
-
-                NO color codes visible in image."""
-
+                prompt = f"""Social media post: GRAPHICS ONLY
+            Theme: {post_content}
+            Style: Create {image_design} visual design with artistic composition, professional illustration techniques, and cohesive aesthetic
+            Requirements: 
+            - ABSOLUTELY NO TEXT of any kind
+            - NO letters, words, characters, or symbols
+            - NO numbers or numerical digits
+            - NO logos with text elements
+            - NO watermarks or text overlays
+            - Pure visual illustration only
+            - Focus on imagery, shapes, icons, and visual elements
+            - Communicate meaning through visuals alone
+            Instructions: {instruction}"""
+                
             else:  # both
-                prompt = f"""Create a social media post combining text and graphics.
+                prompt = f"""Social media post: TEXT + GRAPHICS
+            Text: "{post_title}" | "{post_description}"
+            Style: {image_design}
+            Layout: Balanced text and visuals
+            Instructions: {instruction}
+            Requirements:
+            - Text must be CLEARLY READABLE and legible
+            - Use high contrast between text and background
+            - Choose appropriate font size for social media viewing
+            - Text should be the primary focus
+            - Graphics should COMPLEMENT and SUPPORT the text message
+            - Visual elements must not interfere with text readability
+            - Balance text prominence with supporting imagery
+            - Ensure text remains visible on all devices/screen sizes"""
 
-                TEXT: "{post_title}" and "{post_description}"
-                GRAPHICS: {image_design} style illustrations
-                COLORS: Apply {brand_guidelines.split('Primary:')[1].split()[0] if 'Primary:' in brand_guidelines else '#000000'} color scheme for the background design
-                LAYOUT: Balanced text and visual elements
-                REQUIREMENTS:
-                - Clear, readable text
-                - Complementary graphics that align with the text
-                - Professional design that integrates both elements effectively
-                - {instruction}
-
-                NO color codes visible in the image; use colors only for the background design."""
-
-            print(f"[IMAGE GEN DEBUG] Prompt for image {idx+1}:\n{prompt}")
+            print(f"[IMAGE GEN DEBUG] Prompt {idx+1}:\n{prompt}")
             return prompt
 
-        image_objs = []
-        for idx in range(3):
-            prompt = build_prompt(idx)
-            image_id = await helper.generate_image(
-                brand_guidelines=brand_guidelines,
-                post_data=request.post_data,
-                references=None,
-                mode="generate",
-                prompt_override=prompt
-            )
-            src_path = os.path.join(images_dir, image_id)
-            temp_path = os.path.join(temp_dir, image_id)
-            if os.path.exists(src_path):
-                os.rename(src_path, temp_path)
-            image_objs.append({
-                "image_id": image_id,
-                "image_url": f"/api/business-post/display-image/{image_id}?temp=1",
-                "post_text": post_content,
-                "prompt": prompt
-            })
-        # Save image_ids to draft (as temp reference)
+        prompt = build_prompt(image_no)
+        image_id = await helper.generate_image(
+            brand_guidelines=brand_guidelines,
+            post_data=request.post_data,
+            references=None,
+            mode="generate",
+            prompt_override=prompt
+        )
+        src_path = os.path.join(images_dir, image_id)
+        temp_path = os.path.join(temp_dir, image_id)
+        if os.path.exists(src_path):
+            os.rename(src_path, temp_path)
+        image_obj = {
+            "image_id": image_id,
+            "image_url": f"/api/business-post/display-image/{image_id}?temp=1",
+            "post_text": post_content,
+            "prompt": prompt
+        }
+        # Save image_id to draft (as temp reference)
         draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
         if draft:
             post_options = draft.post_options or []
@@ -783,11 +772,19 @@ async def generate_image_for_post(request: GenerateImageForPostRequest):
             except ValueError:
                 post_index = 0
             draft_image_ids = draft.image_ids or [None, None, None]
-            draft_image_ids[post_index] = [img["image_id"] for img in image_objs]
+            if isinstance(draft_image_ids, list) and len(draft_image_ids) > post_index:
+                if not isinstance(draft_image_ids[post_index], list):
+                    draft_image_ids[post_index] = [None, None, None]
+                draft_image_ids[post_index][image_no] = image_id
+            else:
+                # Ensure the list is long enough
+                while len(draft_image_ids) <= post_index:
+                    draft_image_ids.append([None, None, None])
+                draft_image_ids[post_index][image_no] = image_id
             draft.image_ids = draft_image_ids
             await draft.save()
-        logging.warning("Returning image generation response (3 images, sequential)")
-        return {"images": image_objs}
+        logging.warning("Returning image generation response (single image)")
+        return image_obj
     except Exception as e:
         logging.error(f"Error in image generation: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating images: {str(e)}")

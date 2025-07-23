@@ -10,9 +10,11 @@ def on_queue_update(update):
 
 def fall_ai_image_generator(prompt):
     result = fal_client.subscribe(
-        "fal-ai/flux/dev",
+        # "fal-ai/flux/dev",
+        "fal-ai/recraft/v3/text-to-image",
         arguments={
-            "prompt": prompt
+            "prompt": prompt,
+            "style": "realistic_image"
         },
         with_logs=True,
         on_queue_update=on_queue_update,
