@@ -8,13 +8,13 @@ def on_queue_update(update):
         for log in update.logs:
             print(log["message"])
 
-def fall_ai_image_generator(prompt):
+def fall_ai_image_generator(prompt,style):
     result = fal_client.subscribe(
         # "fal-ai/flux/dev",
         "fal-ai/recraft/v3/text-to-image",
         arguments={
             "prompt": prompt,
-            "style": "realistic_image"
+            "style": style
         },
         with_logs=True,
         on_queue_update=on_queue_update,

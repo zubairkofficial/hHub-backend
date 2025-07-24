@@ -177,14 +177,14 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None) -> str:
+    async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None,style:str=None) -> str:
         # Only use prompt_override; do not use dynamic prompt templates
         if prompt_override:
             prompt = prompt_override
         else:
             # If no prompt_override is provided, do not generate an image
             raise ValueError("A prompt_override must be provided for image generation.")
-        response = fall_ai_image_generator(prompt)
+        response = fall_ai_image_generator(prompt,style)
         image_url = response
         image_id = f"{uuid.uuid4()}.png"
         temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')

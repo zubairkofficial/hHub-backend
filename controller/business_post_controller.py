@@ -89,6 +89,13 @@ class GeneratePostsRequest(BaseModel):
 class GenerateImageForPostRequest(BaseModel):
     user_id: str
     post_data: dict
+    image_design: str
+    instruction: str
+    lighting_effects: str
+    image_mood: str
+    background_type: str
+    focus_area: str
+    image_type: str
 
 class SelectPostRequest(BaseModel):
     draft_id: int
@@ -104,6 +111,7 @@ class BusinessPostUpdateRequest(BaseModel):
     title: Optional[str] = None
     image_id: Optional[str] = None
     status:Optional[str] = None
+    description: Optional[str] = None
 
 class GenerateIdeaPayload(BaseModel):
     user_id: str = Field(...)
@@ -114,12 +122,20 @@ class ImageSettingsRequest(BaseModel):
     image_type: str
     image_design: str
     instruction: str = None
+    lighting_effects: str = None
+    image_mood: str = None
+    background_type: str = None
+    focus_area: str = None
 
 class ImageSettingsResponse(BaseModel):
     user_id: str
     image_type: str
     image_design: str
     instruction: str = None
+    lighting_effects: str = None
+    image_mood: str = None
+    background_type: str = None
+    focus_area: str = None
     created_at: str
     updated_at: str
 
@@ -665,7 +681,22 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
     try:
         # Fetch settings
         settings = await PostSettings.filter(user_id=request.user_id).first()
-        image_settings = await ImageSettings.filter(user_id=request.user_id).first()
+        # Always use image options from the request, not from the database
+        image_type = getattr(request, 'image_type', '')
+        image_design = getattr(request, 'image_design', '')
+        instruction = getattr(request, 'instruction', '')
+        lighting_effects = getattr(request, 'lighting_effects', '')
+        image_mood = getattr(request, 'image_mood', '')
+        background_type = getattr(request, 'background_type', '')
+        focus_area = getattr(request, 'focus_area', '')
+        print(f"[IMAGE GEN DEBUG] image_design 1: {image_design}")
+
+        # Extract post data fields
+        post_title = request.post_data.get('title', '') if hasattr(request, 'post_data') and request.post_data else ''
+        post_description = request.post_data.get('description', '') if hasattr(request, 'post_data') and request.post_data else ''
+        post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') and request.post_data else ''
+        brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
+
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
         helper = BusinessPostHelper()
@@ -675,83 +706,160 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         # Extract color code from brand_guidelines (e.g., #AABBCC)
         color_code = None
         overview = None
-        if settings.brand_guidelines:
-            match = re.search(r"#(?:[0-9a-fA-F]{3}){1,2}", settings.brand_guidelines)
+        if brand_guidelines:
+            match = re.search(r"#(?:[0-9a-fA-F]{3}){1,2}", brand_guidelines)
             if match:
                 color_code = match.group(0)
             # Extract overview if present (e.g., 'Overview: ...')
-            overview_match = re.search(r"Overview[:\-\s]+(.+)", settings.brand_guidelines, re.IGNORECASE)
+            overview_match = re.search(r"Overview[:\-\s]+(.+)", brand_guidelines, re.IGNORECASE)
             if overview_match:
                 overview = overview_match.group(1).strip()
 
-        # Use image_settings if available, else fallback to request or empty string
-        image_type = image_settings.image_type if image_settings and image_settings.image_type else getattr(request, 'image_type', '')
-        image_design = image_settings.image_design if image_settings and image_settings.image_design else getattr(request, 'image_design', '')
-        instruction = image_settings.instruction if image_settings and image_settings.instruction else getattr(request, 'instruction', '')
+        def get_focus_area_instruction(focus_area):
+            """Generate focus area instruction based on selection"""
+            if focus_area == "center":
+                return "Center composition, balanced symmetry"
+            elif focus_area == "left":
+                return "Left-aligned focus and elements"
+            elif focus_area == "right":
+                return "Right-aligned focus and elements"
+            elif focus_area == "random":
+                return "Asymmetrical, dynamic placement"
+            else:
+                return "Balanced composition"
 
-        # Fetch post data (simulate, you may need to fetch from DB if not in request)
-        post_title = request.post_data.get('title', '') if hasattr(request, 'post_data') else ''
-        post_description = request.post_data.get('description', '') if hasattr(request, 'post_data') else ''
-        post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') else ''
-        brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
+        def get_background_instruction(background_type):
+            """Generate background instruction based on selection"""
+            if background_type == "plain":
+                return "Clean solid background"
+            elif background_type == "textured":
+                return "Subtle textured background"
+            elif background_type == "gradient":
+                return "Smooth gradient background"
+            else:
+                return "Complementary background"
+
+        def get_mood_instruction(image_mood):
+            """Generate mood instruction based on selection"""
+            if image_mood == "cheerful":
+                return "Upbeat, vibrant, energetic"
+            elif image_mood == "calm":
+                return "Peaceful, soft tones"
+            elif image_mood == "mysterious":
+                return "Intriguing, deeper tones"
+            else:
+                return "Balanced emotional tone"
+
+        def get_lighting_instruction(lighting_effects):
+            """Generate lighting instruction based on selection"""
+            if lighting_effects == "bright":
+                return "Bright, well-lit"
+            elif lighting_effects == "soft":
+                return "Gentle, diffused lighting"
+            elif lighting_effects == "dramatic":
+                return "High-contrast, bold shadows"
+            else:
+                return "Natural balanced lighting"
+
+        def truncate_text(text, max_length=100):
+            """Truncate text to specified length"""
+            if not text:
+                return ""
+            return text[:max_length] + "..." if len(text) > max_length else text
+
+        def validate_and_trim_prompt(prompt, max_length=1000):
+            """Check prompt length and trim if necessary"""
+            if len(prompt) <= max_length:
+                return prompt
+            
+            # Find key sections to preserve
+            lines = prompt.split('\n')
+            essential_lines = []
+            current_length = 0
+            
+            for line in lines:
+                if current_length + len(line) + 1 <= max_length:
+                    essential_lines.append(line)
+                    current_length += len(line) + 1
+                else:
+                    break
+            
+            trimmed_prompt = '\n'.join(essential_lines)
+            if len(trimmed_prompt) < max_length - 20:
+                trimmed_prompt += "\n[Content trimmed for optimization]"
+            
+            return trimmed_prompt
 
         def build_prompt(idx):
-    
-            if image_type == "text_only":
-                prompt = f"""Social media post: TEXT ONLY
-            Title: "{post_title}"
-            Description: "{post_description}"
-            Style: Create a {image_design} aesthetic with professional typography and layout design
+            # Truncate user-provided fields
+            title_truncated = post_title
+            description_truncated = post_description
+            content_truncated = post_content
+            instruction_truncated = instruction
+            design_truncated = image_design
+            
+            # Get shortened instructions for features
+            focus_instruction = get_focus_area_instruction(focus_area)
+            background_instruction = get_background_instruction(background_type)
+            mood_instruction = get_mood_instruction(image_mood)
+            lighting_instruction = get_lighting_instruction(lighting_effects)
+            
+            # Compact feature requirements
+            features = f"Focus: {focus_instruction} | BG: {background_instruction} | Mood: {mood_instruction} | Light: {lighting_instruction}"
 
-            Requirements:
-            - Focus entirely on typography and text presentation
-            - NO graphics, illustrations, icons, or visual elements
-            - Use creative text layouts, fonts, and typographic hierarchy
-            - Apply color schemes to backgrounds, text, and design elements
-            - Ensure text is the sole visual communication method
-            Instructions: {instruction}"""
+            if image_type == "text_only":
+                prompt = f"""TEXT ONLY Post
+                    Title: "{title_truncated}"
+                    Desc: "{description_truncated}"
+                    Style: {design_truncated} typography design
+
+                    Rules:
+                    - Typography focus only
+                    - NO graphics/icons
+                    - Creative text layouts
+                    - Color schemes for text/bg
+                    {features}
+                    Extra: {instruction_truncated}"""
                 
             elif image_type == "image_only":
-                prompt = f"""Social media post: GRAPHICS ONLY
-            Theme: {post_content}
-            Style: Create {image_design} visual design with artistic composition, professional illustration techniques, and cohesive aesthetic
-            Requirements: 
-            - ABSOLUTELY NO TEXT of any kind
-            - NO letters, words, characters, or symbols
-            - NO numbers or numerical digits
-            - NO logos with text elements
-            - NO watermarks or text overlays
-            - Pure visual illustration only
-            - Focus on imagery, shapes, icons, and visual elements
-            - Communicate meaning through visuals alone
-            Instructions: {instruction}"""
-                
-            else:  # both
-                prompt = f"""Social media post: TEXT + GRAPHICS
-            Text: "{post_title}" | "{post_description}"
-            Style: {image_design}
-            Layout: Balanced text and visuals
-            Instructions: {instruction}
-            Requirements:
-            - Text must be CLEARLY READABLE and legible
-            - Use high contrast between text and background
-            - Choose appropriate font size for social media viewing
-            - Text should be the primary focus
-            - Graphics should COMPLEMENT and SUPPORT the text message
-            - Visual elements must not interfere with text readability
-            - Balance text prominence with supporting imagery
-            - Ensure text remains visible on all devices/screen sizes"""
+                prompt = f"""GRAPHICS ONLY Post
+                    Theme: {content_truncated}
+                    Style: {design_truncated} visual design
 
-            print(f"[IMAGE GEN DEBUG] Prompt {idx+1}:\n{prompt}")
-            return prompt
+                    Rules: 
+                    - NO TEXT/letters/symbols
+                    - Pure visual illustration
+                    - Communicate via visuals only
+                    {features}
+                    Extra: {instruction_truncated}"""
+            
+            else:  # both
+                prompt = f"""TEXT + GRAPHICS Post
+                    Text: "{title_truncated}" | "{description_truncated}"
+                    Style: {design_truncated}
+
+                        Rules:
+                        - Clear readable text
+                        - High contrast text/bg
+                        - Text is primary focus
+                        - Graphics support text
+                        {features}
+                        Extra: {instruction_truncated}"""
+
+            # Validate and trim if needed
+            final_prompt = prompt
+            print(f"[IMAGE GEN DEBUG] Prompt {idx+1} (Length: {len(final_prompt)}):\n{final_prompt}")
+            return final_prompt
 
         prompt = build_prompt(image_no)
+        print(f"[IMAGE GEN DEBUG] image_desing: {image_design}")
         image_id = await helper.generate_image(
             brand_guidelines=brand_guidelines,
             post_data=request.post_data,
             references=None,
             mode="generate",
-            prompt_override=prompt
+            prompt_override=prompt,
+            style=image_design
         )
         src_path = os.path.join(images_dir, image_id)
         temp_path = os.path.join(temp_dir, image_id)
@@ -763,32 +871,13 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
             "post_text": post_content,
             "prompt": prompt
         }
-        # Save image_id to draft (as temp reference)
-        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
-        if draft:
-            post_options = draft.post_options or []
-            try:
-                post_index = post_options.index(post_content)
-            except ValueError:
-                post_index = 0
-            draft_image_ids = draft.image_ids or [None, None, None]
-            if isinstance(draft_image_ids, list) and len(draft_image_ids) > post_index:
-                if not isinstance(draft_image_ids[post_index], list):
-                    draft_image_ids[post_index] = [None, None, None]
-                draft_image_ids[post_index][image_no] = image_id
-            else:
-                # Ensure the list is long enough
-                while len(draft_image_ids) <= post_index:
-                    draft_image_ids.append([None, None, None])
-                draft_image_ids[post_index][image_no] = image_id
-            draft.image_ids = draft_image_ids
-            await draft.save()
+
         logging.warning("Returning image generation response (single image)")
         return image_obj
     except Exception as e:
         logging.error(f"Error in image generation: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating images: {str(e)}")
-
+    
 @router.post("/business-post/draft/select-post")
 async def select_post(request: SelectPostRequest):
     try:
@@ -920,8 +1009,18 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
                 draft.content = request.post
             if request.title is not None:
                 draft.title = request.title
-            if request.image_id is not None:
-                draft.selected_image_id = request.image_id
+            if hasattr(request, 'description') and request.description is not None:
+                draft.description = request.description
+            # Update post_options at selected_post_index
+            if draft.post_options and draft.selected_post_index is not None:
+                idx = draft.selected_post_index
+                if 0 <= idx < len(draft.post_options):
+                    opt = draft.post_options[idx]
+                    if isinstance(opt, dict):
+                        opt['content'] = request.post if request.post is not None else opt.get('content', '')
+                        opt['title'] = request.title if request.title is not None else opt.get('title', '')
+                        opt['description'] = request.description if hasattr(request, 'description') and request.description is not None else opt.get('description', '')
+                        draft.post_options[idx] = opt
             await draft.save()
             return BusinessPostResponse(
                 id=draft.id,
@@ -929,7 +1028,7 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
                 status='draft',
                 created_at=draft.created_at.isoformat(),
                 title=getattr(draft, 'title', None),
-                image_id=getattr(draft, 'selected_image_id', None)
+                description=getattr(draft, 'description', None),
             )
         else:
             post = await BusinessPost.get(id=post_id)
@@ -939,8 +1038,6 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
                 post.post = request.post
             if request.title is not None:
                 post.title = request.title
-            if request.image_id is not None:
-                post.image_id = request.image_id
             await post.save()
             return BusinessPostResponse(
                 id=post.id,
@@ -948,7 +1045,6 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
                 status=post.status,
                 created_at=post.created_at.isoformat(),
                 title=getattr(post, 'title', None),
-                image_id=getattr(post, 'image_id', None)
             )
     except Exception as e:
         print(e)
@@ -1002,13 +1098,17 @@ async def get_post_prompt_defaults():
 
 @router.post("/post-settings/image-options")
 async def upsert_image_settings(request: ImageSettingsRequest):
-    print("data = {request}")
+    print(f"data = {request}")
     try:
         existing = await ImageSettings.filter(user_id=request.user_id).first()
         if existing:
             existing.image_type = request.image_type
             existing.image_design = request.image_design
             existing.instruction = request.instruction
+            existing.lighting_effects = request.lighting_effects
+            existing.image_mood = request.image_mood
+            existing.background_type = request.background_type
+            existing.focus_area = request.focus_area
             await existing.save()
             settings = existing
         else:
@@ -1016,13 +1116,21 @@ async def upsert_image_settings(request: ImageSettingsRequest):
                 user_id=request.user_id,
                 image_type=request.image_type,
                 image_design=request.image_design,
-                instruction=request.instruction
+                instruction=request.instruction,
+                lighting_effects=request.lighting_effects,
+                image_mood=request.image_mood,
+                background_type=request.background_type,
+                focus_area=request.focus_area
             )
         return ImageSettingsResponse(
             user_id=settings.user_id,
-            image_type=settings.image_type,
-            image_design=settings.image_design,
-            instruction=settings.instruction,
+            image_type=settings.image_type or "",
+            image_design=settings.image_design or "",
+            instruction=settings.instruction or "",
+            lighting_effects=settings.lighting_effects or "",
+            image_mood=settings.image_mood or "",
+            background_type=settings.background_type or "",
+            focus_area=settings.focus_area or "",
             created_at=settings.created_at.isoformat(),
             updated_at=settings.updated_at.isoformat()
         )
@@ -1037,43 +1145,15 @@ async def get_image_settings(user_id: str = Query(...)):
             raise HTTPException(status_code=404, detail="Image settings not found")
         return ImageSettingsResponse(
             user_id=settings.user_id,
-            image_type=settings.image_type,
-            image_design=settings.image_design,
-            instruction=settings.instruction,
+            image_type=settings.image_type or "",
+            image_design=settings.image_design or "",
+            instruction=settings.instruction or "",
+            lighting_effects=settings.lighting_effects or "",
+            image_mood=settings.image_mood or "",
+            background_type=settings.background_type or "",
+            focus_area=settings.focus_area or "",
             created_at=settings.created_at.isoformat(),
             updated_at=settings.updated_at.isoformat()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching image settings: {str(e)}")
-
-
-# @router.post("/business-post/upload-reference-image")
-# async def upload_reference_image(user_id: str = Form(...), slot: int = Form(...), file: UploadFile = File(...)):
-#     import os
-#     images_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'reference_images'))
-#     os.makedirs(images_dir, exist_ok=True)
-#     def sanitize_filename(filename, max_length=100):
-#         import re
-#         filename = re.sub(r'[<>:"/\\|?*%&=]', '_', filename)
-#         if len(filename) > max_length:
-#             name, ext = os.path.splitext(filename)
-#             filename = name[:max_length-len(ext)] + ext
-#         return filename
-#     slot = max(1, min(3, int(slot)))  # Ensure slot is 1, 2, or 3
-#     filename = sanitize_filename(f"ref_{user_id}_{slot}_{file.filename}")
-#     file_path = os.path.join(images_dir, filename)
-#     print(f"Saving reference image to: {file_path}")
-#     with open(file_path, "wb") as f:
-#         f.write(await file.read())
-#     # Update the correct slot in PostSettings
-#     settings = await PostSettings.filter(user_id=user_id).first()
-#     if settings:
-#         ref_images = settings.reference_images or [None, None, None]
-#         # Ensure the list is always 3 elements
-#         while len(ref_images) < 3:
-#             ref_images.append(None)
-#         ref_images[slot-1] = filename
-#         settings.reference_images = ref_images
-#         await settings.save()
-#     return {"message": f"Reference image for slot {slot} uploaded", "filename": filename}
-
