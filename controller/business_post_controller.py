@@ -20,6 +20,8 @@ import re
 import json
 from io import BytesIO
 from models.image_settings import ImageSettings
+from models.image_generation_setting import ImageGenerationSetting
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -138,6 +140,9 @@ class ImageSettingsResponse(BaseModel):
     focus_area: str = None
     created_at: str
     updated_at: str
+
+class ImageGenSettingRequest(BaseModel):
+    num_images: int
 
 helper = BusinessPostHelper()
 
@@ -398,7 +403,7 @@ async def upload_post_settings_file(file_type:str = "pdf", user_id: int = Query(
             prompt = (
                 "You are an expert in social media branding. "
                 "Given the following extracted content from a brand guidelines document, do the following:\n"
-                "1. Extract the color palette as a list of hex color codes. For each color, specify if it is primary, secondary, accent, or other (if possible). Output each color on a new line in the format: <label>: <hex> (e.g., Primary: #FF5733). If the role is not clear, just output the hex code.\n"
+                "1. Extract the color palette as a list of RGB color codes. For each color, specify if it is primary, secondary, accent, or other (if possible). Output each color on a new line in the format: <label>: rgb(R, G, B) (e.g., Primary: rgb(255, 87, 51)). If the role is not clear, just output the RGB code.\n"
                 "2. Write a clear, plain-text overview of the brand in no more than 50 words. Do not use tags or formatting.\n"
                 "Separate the two sections with the line '---'.\n"
                 "If no colors are found, leave the first section empty.\n\n"
@@ -681,6 +686,9 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
     try:
         # Fetch settings
         settings = await PostSettings.filter(user_id=request.user_id).first()
+        # Always use admin setting for number of images
+        setting = await ImageGenerationSetting.filter(id=1).first()
+        num_images = setting.num_images if setting else 1
         # Always use image options from the request, not from the database
         image_type = getattr(request, 'image_type', '')
         image_design = getattr(request, 'image_design', '')
@@ -691,11 +699,13 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         focus_area = getattr(request, 'focus_area', '')
         print(f"[IMAGE GEN DEBUG] image_design 1: {image_design}")
 
+
         # Extract post data fields
         post_title = request.post_data.get('title', '') if hasattr(request, 'post_data') and request.post_data else ''
         post_description = request.post_data.get('description', '') if hasattr(request, 'post_data') and request.post_data else ''
         post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') and request.post_data else ''
         brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
+        print(f"[IMAGE GEN DEBUG] brand_guidelines: {brand_guidelines}")
 
         if not settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
@@ -1157,3 +1167,22 @@ async def get_image_settings(user_id: str = Query(...)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching image settings: {str(e)}")
+
+@router.get("/admin/image-generation-setting")
+async def get_image_generation_setting():
+    setting = await ImageGenerationSetting.filter(id=1).first()
+    if not setting:
+        # Create default if not exists
+        setting = await ImageGenerationSetting.create(id=1, num_images=1)
+    return {"num_images": setting.num_images}
+
+@router.post("/admin/image-generation-setting")
+async def set_image_generation_setting(payload: ImageGenSettingRequest):
+    num_images = payload.num_images
+    setting = await ImageGenerationSetting.filter(id=1).first()
+    if not setting:
+        setting = await ImageGenerationSetting.create(id=1, num_images=num_images)
+    else:
+        setting.num_images = num_images
+        await setting.save()
+    return {"num_images": setting.num_images}
