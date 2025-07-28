@@ -14,14 +14,17 @@ from models.post_draft import PostDraft
 import logging
 import shutil
 import httpx
-import asyncio
 from models.post_prompt_settings import PostPromptSettings
-import re
 import json
 from io import BytesIO
 from models.image_settings import ImageSettings
 from models.image_generation_setting import ImageGenerationSetting
 from pydantic import BaseModel
+import base64
+from openai import OpenAI
+import re
+import time
+import uuid
 
 router = APIRouter()
 
@@ -57,7 +60,7 @@ class PostSettingsResponse(BaseModel):
     monthly_dates: Optional[list] = None
     uploaded_file: Optional[str] = None
     extracted_file_text: Optional[str] = None
-    reference_images: Optional[List[str]] = None
+    reference_images: Optional[List[dict]] = None  # Changed from List[str] to List[dict]
 
 
 class ApprovePostRequest(BaseModel):
@@ -205,23 +208,15 @@ async def get_post_settings(user_id: int = Query(...)):
         if not settings:
             raise HTTPException(status_code=404, detail="Settings not found")
 
-        # Ensure reference_images is a list, not a string
+        # Get reference_images as is (should be a list of dicts or None)
         reference_images = settings.reference_images
-        if isinstance(reference_images, str):
-            try:
-                reference_images = json.loads(reference_images)
-                print(f"[DEBUG] Parsed reference_images: {reference_images} (type: {type(reference_images)})")
-            except Exception as e:
-                print(f"[DEBUG] Error parsing reference_images: {e}")
-                reference_images = [None, None, None]
+        if reference_images is None:
+            reference_images = []
+        
+        # Ensure it's a list
         if not isinstance(reference_images, list):
-            print(f"[DEBUG] reference_images is not a list after parsing, setting to [None, None, None]")
-            reference_images = [None, None, None]
-        while len(reference_images) < 3:
-            reference_images.append(None)
-        reference_images = reference_images[:3]
-        # Convert all None to empty string for Pydantic
-        reference_images = [img if isinstance(img, str) else "" for img in reference_images]
+            reference_images = []
+        
         print(f"[DEBUG] Final reference_images to return: {reference_images}")
 
         return PostSettingsResponse(
@@ -689,6 +684,7 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         # Always use admin setting for number of images
         setting = await ImageGenerationSetting.filter(id=1).first()
         num_images = setting.num_images if setting else 1
+        
         # Always use image options from the request, not from the database
         image_type = getattr(request, 'image_type', '')
         image_design = getattr(request, 'image_design', '')
@@ -697,6 +693,17 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         image_mood = getattr(request, 'image_mood', '')
         background_type = getattr(request, 'background_type', '')
         focus_area = getattr(request, 'focus_area', '')
+        
+        # Get reference images for layout analysis
+        reference_layout = None
+        if settings and settings.reference_images:
+            # Find matching reference image based on image_type
+            for ref_image in settings.reference_images:
+                if ref_image.get('analysis_type') == image_type:
+                    reference_layout = ref_image
+                    break
+        else:
+            print(f"[IMAGE GEN DEBUG] No reference images found for user {request.user_id}")
         print(f"[IMAGE GEN DEBUG] image_design 1: {image_design}")
 
 
@@ -777,7 +784,7 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
                 return ""
             return text[:max_length] + "..." if len(text) > max_length else text
 
-        def validate_and_trim_prompt(prompt, max_length=1000):
+        def validate_and_trim_prompt(prompt, max_length=2500):
             """Check prompt length and trim if necessary"""
             if len(prompt) <= max_length:
                 return prompt
@@ -816,59 +823,143 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
             
             # Compact feature requirements
             features = f"Focus: {focus_instruction} | BG: {background_instruction} | Mood: {mood_instruction} | Light: {lighting_instruction}"
+            
+            # Add reference layout analysis if available
+            layout_instruction = ""
+            if reference_layout:
+                reference_prompt = reference_layout.get('reference_prompt')
+                if reference_prompt:
+                    layout_instruction = f"\n\nREFERENCE LAYOUT PROMPT (use this for layout/background):\n{reference_prompt}\n"
+                    print(f"[IMAGE GEN DEBUG] Using reference layout for {image_type}: {reference_prompt}")
+                else:
+                    layout_instruction = ""
+                    print(f"[IMAGE GEN DEBUG] No reference_prompt found in reference_layout")
+            else:
+                print(f"[IMAGE GEN DEBUG] No reference layout available for {image_type}")
 
             if image_type == "text_only":
-                prompt = f"""TEXT ONLY Post
+                prompt = f"""SOCIAL MEDIA POST - TEXT ONLY LAYOUT
+                    Create a social media post graphic (NOT a product mockup)
                     Title: "{title_truncated}"
                     Desc: "{description_truncated}"
                     Style: {design_truncated} typography design
 
                     Rules:
+                    - Create a social media post layout (square format)
                     - Typography focus only
                     - NO graphics/icons
-                    - Creative text layouts
+                    - NO product mockups (shirts, mugs, etc.)
+                    - Creative text layouts for social media
                     - Color schemes for text/bg
                     {features}
-                    Extra: {instruction_truncated}"""
+                    Extra: {instruction_truncated}{layout_instruction}"""
                 
             elif image_type == "image_only":
-                prompt = f"""GRAPHICS ONLY Post
+                prompt = f"""SOCIAL MEDIA POST - GRAPHICS ONLY LAYOUT
+                    Create a social media post graphic (NOT a product mockup)
                     Theme: {content_truncated}
                     Style: {design_truncated} visual design
 
                     Rules: 
+                    - Create a social media post layout (square format)
                     - NO TEXT/letters/symbols
-                    - Pure visual illustration
+                    - NO product mockups (shirts, mugs, etc.)
+                    - Pure visual illustration for social media
                     - Communicate via visuals only
                     {features}
-                    Extra: {instruction_truncated}"""
+                    Extra: {instruction_truncated}{layout_instruction}"""
             
             else:  # both
-                prompt = f"""TEXT + GRAPHICS Post
+                prompt = f"""SOCIAL MEDIA POST - TEXT + GRAPHICS LAYOUT
+                    Create a social media post graphic (NOT a product mockup)
                     Text: "{title_truncated}" | "{description_truncated}"
                     Style: {design_truncated}
 
-                        Rules:
-                        - Clear readable text
-                        - High contrast text/bg
-                        - Text is primary focus
-                        - Graphics support text
-                        {features}
-                        Extra: {instruction_truncated}"""
+                    Rules:
+                    - Create a social media post layout (square format)
+                    - Clear readable text
+                    - High contrast text/bg
+                    - Text is primary focus
+                    - Graphics support text
+                    - NO product mockups (shirts, mugs, etc.)
+                    {features}
+                    Extra: {instruction_truncated}{layout_instruction}"""
 
-            # Validate and trim if needed
+            # Return full prompt without trimming for debugging
             final_prompt = prompt
-            print(f"[IMAGE GEN DEBUG] Prompt {idx+1} (Length: {len(final_prompt)}):\n{final_prompt}")
+            print(f"[IMAGE GEN DEBUG] Prompt {idx+1} (Full Length: {len(final_prompt)}):\n{final_prompt}")
             return final_prompt
 
         prompt = build_prompt(image_no)
-        print(f"[IMAGE GEN DEBUG] image_desing: {image_design}")
+        print(f"[IMAGE GEN DEBUG] image_design: {image_design}")
+        
+        # Optimize prompt to exactly 995 characters while preserving all data
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            
+            optimization_prompt = f"""
+            Compress this image generation prompt to exactly 995 characters while preserving ALL important information:
+
+            ORIGINAL PROMPT ({len(prompt)} characters):
+            {prompt}
+
+            REQUIREMENTS:
+            - Keep ALL reference layout analysis (colors, spacing, background, layout)
+            - Keep ALL design rules and features
+            - Keep ALL content (title, description, style, etc.)
+            - Use abbreviations: bg, txt, img, etc.
+            - Remove redundant words but keep meaning
+            - Output exactly 995 characters
+            - NO markdown, NO quotes, NO code blocks
+
+            COMPRESSED PROMPT (995 chars):
+            """
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert at compressing image generation prompts to exact character counts while preserving all important information."
+                    },
+                    {
+                        "role": "user",
+                        "content": optimization_prompt
+                    }
+                ],
+                temperature=0.1,
+                max_tokens=1500
+            )
+            
+            optimized_prompt = response.choices[0].message.content.strip()
+            
+            # Remove markdown code blocks if present
+            if optimized_prompt.startswith('```'):
+                lines = optimized_prompt.split('\n')
+                if len(lines) > 2:
+                    optimized_prompt = '\n'.join(lines[1:-1])
+            
+            print(f"[IMAGE GEN DEBUG] Original prompt length: {len(prompt)}")
+            print(f"[IMAGE GEN DEBUG] Optimized prompt length: {len(optimized_prompt)}")
+            print(f"[IMAGE GEN DEBUG] Optimized prompt: {optimized_prompt}")
+            
+            # Use the optimized prompt directly - no trimming
+            final_prompt = optimized_prompt
+            
+        except Exception as e:
+            print(f"[IMAGE GEN DEBUG] Error optimizing prompt with GPT: {e}")
+            # If GPT fails, use original prompt (let the API handle it)
+            final_prompt = prompt
+        
+        print(f"[IMAGE GEN DEBUG] Final prompt length: {len(final_prompt)} chars")
+        
         image_id = await helper.generate_image(
             brand_guidelines=brand_guidelines,
             post_data=request.post_data,
             references=None,
             mode="generate",
-            prompt_override=prompt,
+            prompt_override=final_prompt,
             style=image_design
         )
         src_path = os.path.join(images_dir, image_id)
@@ -1186,3 +1277,248 @@ async def set_image_generation_setting(payload: ImageGenSettingRequest):
         setting.num_images = num_images
         await setting.save()
     return {"num_images": setting.num_images}
+
+@router.post("/business-post/upload-reference-image")
+async def upload_reference_image(
+    file: UploadFile = File(...),
+    analysis_type: str = Form(...),
+    user_id: str = Form(...)
+):
+    """
+    Upload reference image, analyze its layout, and save both image and analysis to database
+    """
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Save the uploaded image
+        uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'reference_images')
+        os.makedirs(uploads_dir, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"ref_{user_id}_{int(time.time())}_{uuid.uuid4().hex[:8]}{file_extension}"
+        file_path = os.path.join(uploads_dir, unique_filename)
+        
+        # Save file
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+        
+        # Analyze the image layout using GPT Vision
+        image_content = open(file_path, "rb").read()
+        base64_image = base64.b64encode(image_content).decode('utf-8')
+        
+        # Create OpenAI client
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # Define analysis prompt based on type - focus only on colors, spacing, and background
+        analysis_prompts = {
+            "text_only": """Analyze this image and provide a concise layout analysis focusing ONLY on:
+1. **Color Scheme**: Main colors used (max 3-4 colors)
+2. **Spacing**: Padding and margins around elements
+3. **Background**: Type and any effects
+4. **Layout Structure**: Basic composition and balance
+
+DO NOT include any text content analysis.
+Keep the response under 320 characters total.
+
+Return ONLY valid JSON with this structure:
+{
+    "color_scheme": {
+        "main_colors": ["color1", "color2", "color3"],
+        "accent_colors": ["color1", "color2"]
+    },
+    "spacing": {
+        "padding": "brief description",
+        "margins": "brief description"
+    },
+    "background": {
+        "type": "brief description",
+        "effects": "brief description"
+    },
+    "layout": {
+        "composition": "brief description",
+        "balance": "brief description"
+    }
+}""",
+            
+            "image_only": """Analyze this image and provide a concise layout analysis focusing ONLY on:
+1. **Color Scheme**: Main colors used (max 3-4 colors)
+2. **Spacing**: Padding and margins around elements
+3. **Background**: Type and any effects
+4. **Layout Structure**: Basic composition and balance
+
+DO NOT include any visual element analysis.
+Keep the response under 320 characters total.
+
+Return ONLY valid JSON with this structure:
+{
+    "color_scheme": {
+        "main_colors": ["color1", "color2", "color3"],
+        "accent_colors": ["color1", "color2"]
+    },
+    "spacing": {
+        "padding": "brief description",
+        "margins": "brief description"
+    },
+    "background": {
+        "type": "brief description",
+        "effects": "brief description"
+    },
+    "layout": {
+        "composition": "brief description",
+        "balance": "brief description"
+    }
+}""",
+            
+            "both": """Analyze this image and provide a concise layout analysis focusing ONLY on:
+1. **Color Scheme**: Main colors used (max 3-4 colors)
+2. **Spacing**: Padding and margins around elements
+3. **Background**: Type and any effects
+4. **Layout Structure**: Basic composition and balance
+
+DO NOT include any text or visual element content analysis.
+Keep the response under 320 characters total.
+
+Return ONLY valid JSON with this structure:
+{
+    "color_scheme": {
+        "main_colors": ["color1", "color2", "color3"],
+        "accent_colors": ["color1", "color2"]
+    },
+    "spacing": {
+        "padding": "brief description",
+        "margins": "brief description"
+    },
+    "background": {
+        "type": "brief description",
+        "effects": "brief description"
+    },
+    "layout": {
+        "composition": "brief description",
+        "balance": "brief description"
+    }
+}"""
+        }
+        
+        prompt = analysis_prompts.get(analysis_type, analysis_prompts["both"])
+        
+        # Call GPT Vision API
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert graphic designer and layout analyst. Provide detailed, accurate analysis of image layouts in structured JSON format."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.1
+        )
+        analysis_result = response.choices[0].message.content
+
+        # Generate a single compact prompt string for layout/background only using GPT
+        reference_prompt = None
+        try:
+            import json
+            json_match = re.search(r'\{.*\}', analysis_result, re.DOTALL)
+            layout_json_str = json_match.group() if json_match else analysis_result
+            gpt_prompt = f"""
+            Given this layout analysis JSON, write a single, compact prompt (max 320 characters) describing ONLY the layout and background (ignore colors, text, and content). Focus on background type, effects, composition, balance, padding, and margins. Do NOT mention colors or text. Use natural language suitable for an image generation prompt.
+
+            JSON:
+            {layout_json_str}
+
+            Prompt (max 320 chars):
+            """
+            gpt_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert at writing concise, natural language prompts for image generation based on layout/background JSON."},
+                    {"role": "user", "content": gpt_prompt}
+                ],
+                temperature=0.1,
+                max_tokens=400
+            )
+            reference_prompt = gpt_response.choices[0].message.content.strip()
+            if reference_prompt.startswith('```'):
+                lines = reference_prompt.split('\n')
+                if len(lines) > 2:
+                    reference_prompt = '\n'.join(lines[1:-1])
+        except Exception as e:
+            reference_prompt = None
+            print(f"[REFERENCE PROMPT ERROR] {e}")
+
+        # Get user's post settings
+        settings = await PostSettings.filter(user_id=user_id).first()
+        if not settings:
+            raise HTTPException(status_code=404, detail="Post settings not found")
+        
+        # Prepare reference image data (only necessary fields)
+        reference_data = {
+            "image_filename": unique_filename,
+            "analysis_type": analysis_type,
+            "reference_prompt": reference_prompt,
+            "uploaded_at": datetime.now().isoformat(),
+            "file_size": os.path.getsize(file_path)
+        }
+        
+        # Update reference_images field
+        current_references = getattr(settings, 'reference_images', []) or []
+        
+        # Remove existing image of the same type (replace instead of append)
+        current_references = [ref for ref in current_references if ref.get('analysis_type') != analysis_type]
+        
+        # Add the new reference image
+        current_references.append(reference_data)
+        
+        # Keep only the last 10 reference images (though we should only have 3 max now)
+        if len(current_references) > 10:
+            current_references = current_references[-10:]
+        
+        settings.reference_images = current_references
+        await settings.save()
+        
+        return {
+            "success": True,
+            "message": "Reference image uploaded and analyzed successfully",
+            "image_filename": unique_filename,
+            "analysis_type": analysis_type
+        }
+        
+    except Exception as e:
+        logging.error(f"Error in reference image upload: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading reference image: {str(e)}")
+
+@router.get("/business-post/display-reference-image/{filename}")
+async def display_reference_image(filename: str):
+    """
+    Display reference images from the reference_images folder
+    """
+    try:
+        reference_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'reference_images')
+        file_path = os.path.join(reference_dir, filename)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"Reference image not found: {filename}")
+        
+        return FileResponse(file_path)
+        
+    except Exception as e:
+        logging.error(f"Error displaying reference image: {e}")
+        raise HTTPException(status_code=500, detail=f"Error displaying reference image: {str(e)}")

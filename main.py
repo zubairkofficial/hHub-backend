@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from helper.tortoise_config import lifespan
 from controller.controller import router as lead_router
 
@@ -10,6 +11,15 @@ from controller.business_post_controller import router as business_post_router
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 
 app.include_router(follow_router, prefix="/api", tags=["followup-prediction"])
