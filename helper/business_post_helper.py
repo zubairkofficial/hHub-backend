@@ -14,6 +14,7 @@ import time
 import traceback
 from models.post_prompt_settings import PostPromptSettings
 from pydantic import BaseModel, Field
+from helper.post_setting_helper import get_settings
 import base64
 import json
 import re
@@ -42,15 +43,27 @@ def encode_image(file_path):
 
 class BusinessPostHelper:
     def __init__(self):
-        self.llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=1.2,
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        print(f"key: {os.getenv('OPENAI_API_KEY')}")
+        # Initialize without API key, will be set in async methods
+        self.llm = None
+        self.client = None
+
+    async def _get_api_key(self):
+        settings = await get_settings()
+        return settings["openai_api_key"]
+
+    async def _init_clients(self):
+        if self.llm is None:
+            api_key = await self._get_api_key()
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",
+                temperature=1.2,
+                api_key=api_key
+            )
+            self.client = OpenAI(api_key=api_key)
+            print(f"key: {api_key}")
 
     async def generate_post(self, business_idea: str, brand_guidelines: str, extracted_file_text: str = None) -> str:
+        await self._init_clients()
         prompts = await self.get_dynamic_prompts()
         prompt = prompts["post_prompt"]
         prompt_parts = []
@@ -70,6 +83,7 @@ class BusinessPostHelper:
         return response.content.strip()
 
     async def generate_short_idea(self, user_text: str) -> str:
+        await self._init_clients()
         prompts = await self.get_dynamic_prompts()
         prompt = prompts["idea_prompt"]
         prompt = ChatPromptTemplate.from_messages([
@@ -82,10 +96,11 @@ class BusinessPostHelper:
 
     async def generate_post_bundle(self, business_idea: str, keywords: str = None) -> dict:
         # Use the dynamic idea_prompt from settings/admin
+        api_key = await self._get_api_key()
         llm_model = ChatOpenAI(
             model="gpt-4o-mini",
             temperature=1.2,
-            api_key=os.getenv("OPENAI_API_KEY")
+            api_key=api_key
         ).with_structured_output(PostContent)
         
         prompts = await self.get_dynamic_prompts()
@@ -177,7 +192,7 @@ class BusinessPostHelper:
             return FileResponse(path=image_path_png, media_type='image/png')
         raise HTTPException(status_code=404, detail="Image not found")
 
-    async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None,style:str=None) -> str:
+    async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None,style:str=None,negative_prompt:str= "") -> str:
         # Only use prompt_override; do not use dynamic prompt templates
         if prompt_override:
             prompt = prompt_override
@@ -185,7 +200,7 @@ class BusinessPostHelper:
             # If no prompt_override is provided, do not generate an image
             raise ValueError("A prompt_override must be provided for image generation.")
         print(f"test prompt> {prompt}, text style:{style}")
-        response = fall_ai_image_generator(prompt,style)
+        response = await fall_ai_image_generator(prompt,style,negative_prompt)
         image_url = response
         image_id = f"{uuid.uuid4()}.png"
         temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')

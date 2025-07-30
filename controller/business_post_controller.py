@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from helper.business_post_helper import BusinessPostHelper
 from helper.extract_data_from_image import extract_data_from_img
 from helper.prompts_helper import analyse_refference_image
+from helper.Refine_image_prompt import compose_prompt_via_langchain
 from models.post_settings import PostSettings
 from models.business_post import BusinessPost
 from typing import List, Optional, Any
@@ -16,6 +17,7 @@ import logging
 import shutil
 import httpx
 from models.post_prompt_settings import PostPromptSettings
+from helper.post_setting_helper import get_settings
 import json
 from io import BytesIO
 from models.image_settings import ImageSettings
@@ -441,7 +443,8 @@ async def upload_post_settings_file(file_type:str = "pdf", user_id: int = Query(
         if all_text and extension not in ['png', 'jpeg', 'jpg']:
             print("In All Text if statement")
             LLM_API_URL = "https://api.openai.com/v1/chat/completions"
-            LLM_API_KEY = os.getenv("OPENAI_API_KEY")
+            settings = await get_settings()
+            LLM_API_KEY = settings["openai_api_key"]
             prompt = (
                 "You are an expert in social media branding. "
                 "Given the following extracted content from a brand guidelines document, do the following:\n"
@@ -853,7 +856,10 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
             
             return trimmed_prompt
 
-        def build_prompt(idx):
+        negative_prompt = ""
+        aspect_ratio = ""
+        variables_mapping = ""
+        async def build_prompt(idx):
             # Truncate user-provided fields
             title_truncated = post_title
             description_truncated = post_description
@@ -871,15 +877,20 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
             features = f"Focus: {focus_instruction} | BG: {background_instruction} | Mood: {mood_instruction} | Light: {lighting_instruction}"
             
             # Add reference layout analysis if available
-            layout_instruction = ""
+            layout_instruction = None
             if reference_layout:
                 reference_prompt = reference_layout.get('reference_prompt')
                 if reference_prompt:
-                    layout_instruction = f"\n\{reference_prompt}\n"
-                    
-                    print(f"[IMAGE GEN DEBUG] Using reference layout for {image_type}: {reference_prompt}")
+                    # Try to parse the reference_prompt as JSON if it's a string
+                    try:
+                        import json
+                        layout_instruction = json.loads(reference_prompt)
+                    except (json.JSONDecodeError, TypeError):
+                        # If it's not valid JSON, use it as is
+                        layout_instruction = reference_prompt
+                    print(f"[IMAGE GEN DEBUG] Using reference layout for {image_type}: {layout_instruction}")
                 else:
-                    layout_instruction = ""
+                    layout_instruction = None
                     print(f"[IMAGE GEN DEBUG] No reference_prompt found in reference_layout")
             else:
                 print(f"[IMAGE GEN DEBUG] No reference layout available for {image_type}")
@@ -895,22 +906,19 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
                 
                 # If we have a reference layout, edit only the text content
                 if reference_layout and reference_layout.get('reference_prompt'):
-                    print(f"we have in if ")
-                    
+                    print(f"we have in if ={layout_instruction}")
+                  
                     # Apply layout variables to the reference prompt
-                    filled_prompt = apply_layout_variables_dynamic(reference_layout.get('reference_prompt'), title_truncated, description_truncated)
-
-                    prompt = f"""
-{brand_colors}
-{filled_prompt}
-
-Guidelines:
-- Focus only on layout, text content, and structure.
-- Use simple color names (e.g., blue, yellow); avoid hex or RGB codes in description.
-- Maintain visual hierarchy and spacing as defined in reference.
-- Typography should match tone and emphasis of the title/description.
-""".strip()
-
+                    result = await compose_prompt_via_langchain(
+                        reference_layout_json=layout_instruction,     # ← Step‑1 output
+                        title=title_truncated,
+                        description=description_truncated,
+                    )
+                    prompt = result.composed_prompt
+                    negative_prompt = result.negative_prompt
+                    aspect_ratio = result.aspect_ratio
+                    variables_mapping = result.variables_mapping
+                    print(f"Negative Prompt are = {negative_prompt}")
                     print(f"here are final prompt = {prompt}")
                 else:
                     # Fallback to original prompt if no reference layout
@@ -969,7 +977,7 @@ Guidelines:
             print(f"[IMAGE GEN DEBUG] Prompt {idx+1} (Full Length: {len(final_prompt)}):\n{final_prompt}")
             return final_prompt
 
-        prompt = build_prompt(image_no)
+        prompt = await build_prompt(image_no)
         final_prompt = prompt
         # return final_prompt;
         
@@ -980,7 +988,8 @@ Guidelines:
             references=None,
             mode="generate",
             prompt_override=final_prompt,
-            style=image_design
+            style=image_design,
+            negative_prompt=negative_prompt
         )
         src_path = os.path.join(images_dir, image_id)
         temp_path = os.path.join(temp_dir, image_id)
@@ -1169,51 +1178,6 @@ async def update_post(post_id: int, request: BusinessPostUpdateRequest):
         print(e)
         raise HTTPException(status_code=500, detail=f"Error updating post: {str(e)}")
 
-# --- Super Admin Post Prompt Endpoints ---
-@router.get("/post-prompts")
-async def get_post_prompts():
-    prompt = await PostPromptSettings.first()
-    if not prompt:
-        return {
-            "post_prompt": "",
-            "idea_prompt": "",
-            "image_prompt": "",
-        }
-    return {
-        "post_prompt": prompt.post_prompt,
-        "idea_prompt": prompt.idea_prompt,
-        "image_prompt": prompt.image_prompt,
-    }
-
-@router.post("/post-prompts")
-async def update_post_prompts(data: dict):
-    prompt = await PostPromptSettings.first()
-    if not prompt:
-        prompt = await PostPromptSettings.create(
-            post_prompt=data.get("post_prompt"),
-            idea_prompt=data.get("idea_prompt"),
-            image_prompt=data.get("image_prompt"),
-        )
-    else:
-        prompt.post_prompt = data.get("post_prompt", prompt.post_prompt)
-        prompt.idea_prompt = data.get("idea_prompt", prompt.idea_prompt)
-        prompt.image_prompt = data.get("image_prompt", prompt.image_prompt)
-        await prompt.save()
-    return {
-        "post_prompt": prompt.post_prompt,
-        "idea_prompt": prompt.idea_prompt,
-        "image_prompt": prompt.image_prompt,
-    }
-
-@router.get("/post-prompts/defaults")
-async def get_post_prompt_defaults():
-    return {
-        "post_prompt": "",
-        "idea_prompt": "",
-        "image_prompt": "",
-    }
-
-
 
 @router.post("/post-settings/image-options")
 async def upsert_image_settings(request: ImageSettingsRequest):
@@ -1333,7 +1297,8 @@ async def upload_reference_image(
             raise HTTPException(status_code=404, detail="Post settings not found")
 
         # Create OpenAI client
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        settings = await get_settings()
+        client = OpenAI(api_key=settings["openai_api_key"])
         
         # Define analysis prompt based on type - comprehensive design analysis
         analysis_prompts = analyse_refference_image()

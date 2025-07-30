@@ -6,6 +6,7 @@ from typing import Optional
 import os
 from dotenv import load_dotenv
 from models.system_prompt import SystemPrompts
+from helper.post_setting_helper import get_settings
 
 load_dotenv()
 
@@ -17,12 +18,22 @@ class LeadAnalysis(BaseModel):
 
 class LeadScoringService:
     def __init__(self):
-        self.llm = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0,
-            api_key=os.getenv("OPENAI_API_KEY")
-        )
+        # Initialize without API key, will be set in async methods
+        self.llm = None
         self.parser = PydanticOutputParser(pydantic_object=LeadAnalysis)
+
+    async def _get_api_key(self):
+        settings = await get_settings()
+        return settings["openai_api_key"]
+
+    async def _init_llm(self):
+        if self.llm is None:
+            api_key = await self._get_api_key()
+            self.llm = ChatOpenAI(
+                model="gpt-4o-mini",
+                temperature=0,
+                api_key=api_key
+            )
         
         self.default_analytics_prompt = """You are an expert call analyst. Given the following call transcriptions, previous analysis (if any), and client context, write a comprehensive analysis summary that incorporates both historical and new information.\n\nContext:\n- Client Type: {client_type}\n- Service:{service}\n- Location: {state}, {city}\n- First Call: {first_call}\n- Rota Plan: {rota_plan}\n\nPrevious Analysis (if any):\n{previous_analysis}\n\nNew Call Transcriptions:\n\n\nWrite a single, comprehensive analysis summary that incorporates all the provided data, including both historical context from previous analysis and new information from recent calls. Explain how each factor influences the lead's potential and highlight any changes or developments in the client's situation."""
 
@@ -58,6 +69,7 @@ class LeadScoringService:
                              city: Optional[str] = None, first_call: Optional[bool] = None, 
                              rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None) -> dict:
   
+        await self._init_llm()
         prompts = await self.get_prompts()
         print(prompts['analytics_prompt'])
         summary_prompt = ChatPromptTemplate.from_messages([ 
@@ -79,6 +91,7 @@ class LeadScoringService:
         return {"summary": response.content.strip()}
 
     async def score_summary(self, analysis_summary: str) -> LeadAnalysis:
+        await self._init_llm()
         prompts = await self.get_prompts()
         print(prompts['score_prompt'])
       

@@ -4,74 +4,57 @@
 def analyse_refference_image():
     # return "Analyze the reference image for design elements focused solely on text-based content. This includes the background, text layout, font styles, font sizes, font colors, color palette, and overall visual structure. Do not include any analysis of icons, logos, website links, or graphical elements. Highlight how the text is placed and styled to convey its message, the intended audience, and any visual hierarchy used to prioritize information."
     return """
-Examine this image as a professional graphic designer and provide clear, technical steps for text-only recreation.
+You are an expert layout designer and visual analyst.
 
-Do NOT include:
+You will examine the uploaded image and extract a JSON blueprint describing the layout of **text elements only** (no icons, photos, or logos).
 
-Do not include any literal text from the image.
+Return ONLY structured JSON with the following format:
 
-Instead, replace all visible text content with clearly named variables (e.g., {HEADLINE_LINE_1}, {SUBTEXT}, {HIGHLIGHT_WORD}).
-Any references to or analysis of icons, logos, images, or URLs
+{
+  "background": {
+    "color": "white | dark blue | gradient | etc.",
+    "pattern": "none | subtle waves | diagonal lines | etc."
+  },
+  "aspect_ratio": "4:5 | 1:1 | 16:9 | etc.",
+  "blocks": [
+    {
+      "id": "HEADLINE",
+      "role": "headline | subheading | description",
+      "variables": ["{TITLE_LINE_1}", "{TITLE_LINE_2}"],
+      "font_family": "sans | serif",
+      "font_weight": 400 | 600 | 800,
+      "case": "uppercase | titlecase | normal",
+      "color": "white | black | coral | etc.",
+      "align": "left | center | right",
+      "anchor_xy_pct": [X%, Y%],       // top-left anchor of block
+      "width_pct": %width_of_text_block,
+      "line_height_pct": %line_height_relative_to_font,
+      "max_chars_per_line": approximate_max,
+      "effects": ["shadow", "stroke", "outline", "none"]
+    },
+    {
+      "id": "SUBTEXT",
+      ...
+    }
+  ],
+  "effects": {
+    "text_shadow": "none | soft | strong",
+    "text_stroke": "none | thin | bold"
+  },
+  "negative_elements": ["icons", "logos", "images", "URLs"]
+}
 
-Examples or usage scenarios
+Additional rules:
 
-Your response should be limited to the following 5 structured sections, with only step-based instructions per section:
+- Only describe text-based layout and design.
+- Do NOT return any literal text or example words from the image.
+- Variable placeholders like {TITLE_LINE_1} must represent where dynamic user text will go.
+- Approximate all values in percent, not pixels.
+- Avoid any references to brand names, people, products, or photos.
 
-STEP 1: VISUAL INVENTORY
-List only text-related visual elements:
-
-Background appearance and its effect on text
-
-Text content, font types, weights, and sizes
-
-Color usage (name colors only: e.g., “white”, “dark blue”, “coral”)
-
-Text effects (e.g., shadows, strokes, gradients)
-
-Text alignment, grouping, and spacing layout
-
-STEP 2: TECHNICAL MEASUREMENTS
-Estimate and describe:
-
-Text size ratios between elements (e.g., headline vs subtext)
-
-Margin and padding as rough percentages of layout
-
-Distribution of colors in the overall layout
-
-Visual alignment and positioning balance
-
-STEP 3: DESIGN PRINCIPLES ANALYSIS
-Describe how the design works visually:
-
-How contrast is created with text alone
-
-How visual hierarchy is established using text styling
-
-How visual consistency is maintained
-
-How the layout guides the eye flow
-
-STEP 4: TEXT-BASED RECREATION BLUEPRINT
-Provide step-by-step instructions to rebuild the design with only text:
-
-Set up the background and layout container
-
-Place and style headline and supporting text
-
-Apply sizing and spacing rules
-
-Finalize layout using only text and positioning
-
-STEP 5: VARIATION SYSTEM
-Define how to turn this into a reusable template:
-
-Support dynamic substitution of headline and description text
-
-Ensure layout adjusts for varying text lengths
-
-Maintain spacing, styling, and readability regardless of content.
-    """
+Return the JSON directly, with no explanation or prose.
+"""
+    
 
 
 

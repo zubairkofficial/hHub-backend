@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from helper.database import Database
 from openai import OpenAI
+from helper.post_setting_helper import get_settings
 
 load_dotenv()
 
@@ -59,9 +60,10 @@ async def predict_followup_time(call_dates: List[datetime], client_id: int) -> O
     """
 
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        settings = await get_settings()
+        client = OpenAI(api_key=settings["openai_api_key"])
         if not client.api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
+            raise ValueError("OpenAI API key not found in settings or environment variables")
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
