@@ -184,6 +184,7 @@ class BusinessPostHelper:
         else:
             # If no prompt_override is provided, do not generate an image
             raise ValueError("A prompt_override must be provided for image generation.")
+        print(f"test prompt> {prompt}, text style:{style}")
         response = fall_ai_image_generator(prompt,style)
         image_url = response
         image_id = f"{uuid.uuid4()}.png"
