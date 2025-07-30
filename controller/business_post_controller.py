@@ -1292,13 +1292,13 @@ async def upload_reference_image(
         base64_image = base64.b64encode(image_content).decode('utf-8')
         
                 # Get user's post settings
-        settings = await PostSettings.filter(user_id=user_id).first()
-        if not settings:
+        post_settings = await PostSettings.filter(user_id=user_id).first()
+        if not post_settings:
             raise HTTPException(status_code=404, detail="Post settings not found")
 
         # Create OpenAI client
-        settings = await get_settings()
-        client = OpenAI(api_key=settings["openai_api_key"])
+        api_settings = await get_settings()
+        client = OpenAI(api_key=api_settings["openai_api_key"])
         
         # Define analysis prompt based on type - comprehensive design analysis
         analysis_prompts = analyse_refference_image()
@@ -1348,7 +1348,7 @@ async def upload_reference_image(
         }
         
         # Update reference_images field
-        current_references = getattr(settings, 'reference_images', []) or []
+        current_references = getattr(post_settings, 'reference_images', []) or []
         print(f"current_references 1 = {current_references}")
         
         # Remove existing image of the same type (replace instead of append)
@@ -1364,8 +1364,8 @@ async def upload_reference_image(
             current_references = current_references[-10:]
             print(f"current_references 4 in if = {current_references}")
         
-        settings.reference_images = current_references
-        await settings.save()
+        post_settings.reference_images = current_references
+        await post_settings.save()
         
         return {
             "success": True,
