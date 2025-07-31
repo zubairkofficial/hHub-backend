@@ -1291,10 +1291,17 @@ async def upload_reference_image(
         image_content = open(file_path, "rb").read()
         base64_image = base64.b64encode(image_content).decode('utf-8')
         
-                # Get user's post settings
+                # Get user's post settings or create if doesn't exist
         post_settings = await PostSettings.filter(user_id=user_id).first()
         if not post_settings:
-            raise HTTPException(status_code=404, detail="Post settings not found")
+            # Create default post settings for the user
+            post_settings = await PostSettings.create(
+                user_id=user_id,
+                business_idea="",
+                brand_guidelines="",
+                frequency="daily",
+                posts_per_period=1
+            )
 
         # Create OpenAI client
         api_settings = await get_settings()
