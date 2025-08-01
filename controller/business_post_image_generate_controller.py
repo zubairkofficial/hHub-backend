@@ -37,15 +37,8 @@ async def get_user_refference_images(request):
     return settings, num_images
 
 
-async def build_prompt(image_no, post_data, image_type):
-    """Build the image generation prompt based on various inputs."""
-    title = post_data.get('title', '')
-    description = post_data.get('description', '')
-    image_design = post_data.get('image_design', '')
-    instruction = post_data.get('instruction', '')
-
     # **Prompt for image_only**: Only visual content (no text)
-async def build_prompt(image_no, post_data, image_type, settings):
+async def build_prompt(image_no, post_data, image_type):
     """Build the image generation prompt based on various inputs."""
     title = post_data.get('title', '')
     description = post_data.get('description', '')
