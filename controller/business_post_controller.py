@@ -7,6 +7,7 @@ from helper.prompts_helper import analyse_refference_image
 from helper.Refine_image_prompt import compose_prompt_via_langchain
 from models.post_settings import PostSettings
 from models.business_post import BusinessPost
+from helper.image_generator_helper import get_focus_area_instruction,get_background_instruction,get_mood_instruction,get_lighting_instruction
 from typing import List, Optional, Any
 from datetime import datetime
 import os
@@ -140,16 +141,6 @@ class GeneratePostsRequest(BaseModel):
     idea: str
     keywords: str
 
-class GenerateImageForPostRequest(BaseModel):
-    user_id: str
-    post_data: dict
-    image_design: str
-    instruction: str
-    lighting_effects: str
-    image_mood: str
-    background_type: str
-    focus_area: str
-    image_type: str
 
 class SelectPostRequest(BaseModel):
     draft_id: int
@@ -176,20 +167,13 @@ class ImageSettingsRequest(BaseModel):
     image_type: str
     image_design: str
     instruction: str = None
-    lighting_effects: str = None
-    image_mood: str = None
-    background_type: str = None
-    focus_area: str = None
+
 
 class ImageSettingsResponse(BaseModel):
     user_id: str
     image_type: str
     image_design: str
     instruction: str = None
-    lighting_effects: str = None
-    image_mood: str = None
-    background_type: str = None
-    focus_area: str = None
     created_at: str
     updated_at: str
 
@@ -724,288 +708,7 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
-@router.post("/business-post/generate-image-for-post")
-async def generate_image_for_post(request: GenerateImageForPostRequest, image_no: int = Query(0)):
-    import re
-    try:
-        # Fetch settings
-        settings = await PostSettings.filter(user_id=request.user_id).first()
-        # Always use admin setting for number of images
-        setting = await ImageGenerationSetting.filter(id=1).first()
-        num_images = setting.num_images if setting else 1
-        
-        # Always use image options from the request, not from the database
-        image_type = getattr(request, 'image_type', '')
-        image_design = getattr(request, 'image_design', '')
-        instruction = getattr(request, 'instruction', '')
-        lighting_effects = getattr(request, 'lighting_effects', '')
-        image_mood = getattr(request, 'image_mood', '')
-        background_type = getattr(request, 'background_type', '')
-        focus_area = getattr(request, 'focus_area', '')
-        
-        # Get reference images for layout analysis
-        reference_layout = None
-        if settings and settings.reference_images:
-            # Find matching reference image based on image_type
-            for ref_image in settings.reference_images:
-                if ref_image.get('analysis_type') == image_type:
-                    reference_layout = ref_image
-                    break
-        else:
-            print(f"[IMAGE GEN DEBUG] No reference images found for user {request.user_id}")
-        print(f"[IMAGE GEN DEBUG] image_design 1: {image_design}")
 
-
-        # Extract post data fields
-        post_title = request.post_data.get('title', '') if hasattr(request, 'post_data') and request.post_data else ''
-        post_description = request.post_data.get('description', '') if hasattr(request, 'post_data') and request.post_data else ''
-        post_content = request.post_data.get('content', '') if hasattr(request, 'post_data') and request.post_data else ''
-        brand_guidelines = getattr(request, 'brand_guidelines', settings.brand_guidelines)
-        print(f"[IMAGE GEN DEBUG] brand_guidelines: {brand_guidelines}")
-
-        if not settings:
-            raise HTTPException(status_code=404, detail="Post settings not found")
-        helper = BusinessPostHelper()
-        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
-        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-
-        # Extract color code from brand_guidelines (e.g., #AABBCC)
-        color_code = None
-        overview = None
-        if brand_guidelines:
-            match = re.search(r"#(?:[0-9a-fA-F]{3}){1,2}", brand_guidelines)
-            if match:
-                color_code = match.group(0)
-            # Extract overview if present (e.g., 'Overview: ...')
-            overview_match = re.search(r"Overview[:\-\s]+(.+)", brand_guidelines, re.IGNORECASE)
-            if overview_match:
-                overview = overview_match.group(1).strip()
-
-        def get_focus_area_instruction(focus_area):
-            """Generate focus area instruction based on selection"""
-            if focus_area == "center":
-                return "Center composition, balanced symmetry"
-            elif focus_area == "left":
-                return "Left-aligned focus and elements"
-            elif focus_area == "right":
-                return "Right-aligned focus and elements"
-            elif focus_area == "random":
-                return "Asymmetrical, dynamic placement"
-            else:
-                return "Balanced composition"
-
-        def get_background_instruction(background_type):
-            """Generate background instruction based on selection"""
-            if background_type == "plain":
-                return "Clean solid background"
-            elif background_type == "textured":
-                return "Subtle textured background"
-            elif background_type == "gradient":
-                return "Smooth gradient background"
-            else:
-                return "Complementary background"
-
-        def get_mood_instruction(image_mood):
-            """Generate mood instruction based on selection"""
-            if image_mood == "cheerful":
-                return "Upbeat, vibrant, energetic"
-            elif image_mood == "calm":
-                return "Peaceful, soft tones"
-            elif image_mood == "mysterious":
-                return "Intriguing, deeper tones"
-            else:
-                return "Balanced emotional tone"
-
-        def get_lighting_instruction(lighting_effects):
-            """Generate lighting instruction based on selection"""
-            if lighting_effects == "bright":
-                return "Bright, well-lit"
-            elif lighting_effects == "soft":
-                return "Gentle, diffused lighting"
-            elif lighting_effects == "dramatic":
-                return "High-contrast, bold shadows"
-            else:
-                return "Natural balanced lighting"
-
-        def truncate_text(text, max_length=100):
-            """Truncate text to specified length"""
-            if not text:
-                return ""
-            return text[:max_length] + "..." if len(text) > max_length else text
-
-        def validate_and_trim_prompt(prompt, max_length=2500):
-            """Check prompt length and trim if necessary"""
-            if len(prompt) <= max_length:
-                return prompt
-            
-            # Find key sections to preserve
-            lines = prompt.split('\n')
-            essential_lines = []
-            current_length = 0
-            
-            for line in lines:
-                if current_length + len(line) + 1 <= max_length:
-                    essential_lines.append(line)
-                    current_length += len(line) + 1
-                else:
-                    break
-            
-            trimmed_prompt = '\n'.join(essential_lines)
-            if len(trimmed_prompt) < max_length - 20:
-                trimmed_prompt += "\n[Content trimmed for optimization]"
-            
-            return trimmed_prompt
-
-        negative_prompt = ""
-        aspect_ratio = ""
-        variables_mapping = ""
-        async def build_prompt(idx):
-            # Truncate user-provided fields
-            title_truncated = post_title
-            description_truncated = post_description
-            content_truncated = post_content
-            instruction_truncated = instruction
-            design_truncated = image_design
-            
-            # Get shortened instructions for features
-            focus_instruction = get_focus_area_instruction(focus_area)
-            background_instruction = get_background_instruction(background_type)
-            mood_instruction = get_mood_instruction(image_mood)
-            lighting_instruction = get_lighting_instruction(lighting_effects)
-            
-            # Compact feature requirements
-            features = f"Focus: {focus_instruction} | BG: {background_instruction} | Mood: {mood_instruction} | Light: {lighting_instruction}"
-            
-            # Add reference layout analysis if available
-            layout_instruction = None
-            if reference_layout:
-                reference_prompt = reference_layout.get('reference_prompt')
-                if reference_prompt:
-                    # Try to parse the reference_prompt as JSON if it's a string
-                    try:
-                        import json
-                        layout_instruction = json.loads(reference_prompt)
-                    except (json.JSONDecodeError, TypeError):
-                        # If it's not valid JSON, use it as is
-                        layout_instruction = reference_prompt
-                    print(f"[IMAGE GEN DEBUG] Using reference layout for {image_type}: {layout_instruction}")
-                else:
-                    layout_instruction = None
-                    print(f"[IMAGE GEN DEBUG] No reference_prompt found in reference_layout")
-            else:
-                print(f"[IMAGE GEN DEBUG] No reference layout available for {image_type}")
-
-            if image_type == "text_only":
-                # Extract brand colors from brand_guidelines
-                brand_colors = ""
-                if brand_guidelines:
-                    # Extract color codes from brand guidelines
-                    color_matches = re.findall(r"#(?:[0-9a-fA-F]{3}){1,2}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)", brand_guidelines)
-                    if color_matches:
-                        brand_colors = f"Use ONLY these brand colors: {', '.join(color_matches)}"
-                
-                # If we have a reference layout, edit only the text content
-                if reference_layout and reference_layout.get('reference_prompt'):
-                    print(f"we have in if ={layout_instruction}")
-                  
-                    # Apply layout variables to the reference prompt
-                    result = await compose_prompt_via_langchain(
-                        reference_layout_json=layout_instruction,     # ← Step‑1 output
-                        title=title_truncated,
-                        description=description_truncated,
-                    )
-                    prompt = result.composed_prompt
-                    negative_prompt = result.negative_prompt
-                    aspect_ratio = result.aspect_ratio
-                    variables_mapping = result.variables_mapping
-                    print(f"Negative Prompt are = {negative_prompt}")
-                    print(f"here are final prompt = {prompt}")
-                else:
-                    # Fallback to original prompt if no reference layout
-                    print(f"we have in else ")
-                    prompt = f"""SOCIAL MEDIA POST - TEXT ONLY LAYOUT
-                        Create a social media post graphic (NOT a product mockup)
-                        
-                        TEXT CONTENT:
-                        Title: "{title_truncated}"
-                        Description: "{description_truncated}"
-                        
-                        DESIGN REQUIREMENTS:
-                        - Create a new social media post layout
-                        - Typography focus with proper color contrast
-                        - NO additional graphics, icons, or visual elements
-                        - NO product mockups (shirts, mugs, etc.)
-                        
-                        BRAND COLORS: {brand_colors}
-                        STYLE: {design_truncated} typography design
-                        {features}
-                        EXTRA INSTRUCTIONS: {instruction_truncated}"""
-                
-            elif image_type == "image_only":
-                prompt = f"""SOCIAL MEDIA POST - GRAPHICS ONLY LAYOUT
-                    Create a social media post graphic (NOT a product mockup)
-                    Theme: {content_truncated}
-                    Style: {design_truncated} visual design
-
-                    Rules: 
-                    - Create a social media post layout (square format)
-                    - NO TEXT/letters/symbols
-                    - NO product mockups (shirts, mugs, etc.)
-                    - Pure visual illustration for social media
-                    - Communicate via visuals only
-                    {features}
-                    Extra: {instruction_truncated}{layout_instruction}"""
-            
-            else:  # both
-                prompt = f"""SOCIAL MEDIA POST - TEXT + GRAPHICS LAYOUT
-                    Create a social media post graphic (NOT a product mockup)
-                    Text: "{title_truncated}" | "{description_truncated}"
-                    Style: {design_truncated}
-
-                    Rules:
-                    - Create a social media post layout (square format)
-                    - Clear readable text
-                    - High contrast text/bg
-                    - Text is primary focus
-                    - Graphics support text
-                    - NO product mockups (shirts, mugs, etc.)
-                    {features}
-                    Extra: {instruction_truncated}{layout_instruction}"""
-
-            # Return full prompt without trimming for debugging
-            final_prompt = prompt
-            print(f"[IMAGE GEN DEBUG] Prompt {idx+1} (Full Length: {len(final_prompt)}):\n{final_prompt}")
-            return final_prompt
-
-        prompt = await build_prompt(image_no)
-        final_prompt = prompt
-        # return final_prompt;
-        
-        
-        image_id = await helper.generate_image(
-            brand_guidelines=brand_guidelines,
-            post_data=request.post_data,
-            references=None,
-            mode="generate",
-            prompt_override=final_prompt,
-            style=image_design,
-            negative_prompt=negative_prompt
-        )
-        src_path = os.path.join(images_dir, image_id)
-        temp_path = os.path.join(temp_dir, image_id)
-        if os.path.exists(src_path):
-            os.rename(src_path, temp_path)
-        image_obj = {
-            "image_id": image_id,
-            "image_url": f"/api/business-post/display-image/{image_id}?temp=1",
-            "post_text": post_content,
-            "prompt": prompt
-        }
-        return image_obj
-    except Exception as e:
-        logging.error(f"Error in image generation: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating images: {str(e)}")
-        
 @router.post("/business-post/draft/select-post")
 async def select_post(request: SelectPostRequest):
     try:
@@ -1188,10 +891,7 @@ async def upsert_image_settings(request: ImageSettingsRequest):
             existing.image_type = request.image_type
             existing.image_design = request.image_design
             existing.instruction = request.instruction
-            existing.lighting_effects = request.lighting_effects
-            existing.image_mood = request.image_mood
-            existing.background_type = request.background_type
-            existing.focus_area = request.focus_area
+          
             await existing.save()
             settings = existing
         else:
@@ -1200,20 +900,13 @@ async def upsert_image_settings(request: ImageSettingsRequest):
                 image_type=request.image_type,
                 image_design=request.image_design,
                 instruction=request.instruction,
-                lighting_effects=request.lighting_effects,
-                image_mood=request.image_mood,
-                background_type=request.background_type,
-                focus_area=request.focus_area
+ 
             )
         return ImageSettingsResponse(
             user_id=settings.user_id,
             image_type=settings.image_type or "",
             image_design=settings.image_design or "",
             instruction=settings.instruction or "",
-            lighting_effects=settings.lighting_effects or "",
-            image_mood=settings.image_mood or "",
-            background_type=settings.background_type or "",
-            focus_area=settings.focus_area or "",
             created_at=settings.created_at.isoformat(),
             updated_at=settings.updated_at.isoformat()
         )
@@ -1231,10 +924,6 @@ async def get_image_settings(user_id: str = Query(...)):
             image_type=settings.image_type or "",
             image_design=settings.image_design or "",
             instruction=settings.instruction or "",
-            lighting_effects=settings.lighting_effects or "",
-            image_mood=settings.image_mood or "",
-            background_type=settings.background_type or "",
-            focus_area=settings.focus_area or "",
             created_at=settings.created_at.isoformat(),
             updated_at=settings.updated_at.isoformat()
         )

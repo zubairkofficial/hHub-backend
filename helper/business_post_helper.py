@@ -194,43 +194,59 @@ class BusinessPostHelper:
 
     async def generate_image(self, brand_guidelines: str, post_data: dict, references=None, mode="generate", prompt_override=None,style:str=None,negative_prompt:str= "") -> str:
         # Only use prompt_override; do not use dynamic prompt templates
+        await self._init_clients() 
         if prompt_override:
             prompt = prompt_override
         else:
             # If no prompt_override is provided, do not generate an image
             raise ValueError("A prompt_override must be provided for image generation.")
         print(f"test prompt> {prompt}, text style:{style}")
-        response = await fall_ai_image_generator(prompt,style,negative_prompt)
-        image_url = response
-        image_id = f"{uuid.uuid4()}.png"
-        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_path = os.path.join(temp_dir, image_id)
-        img_data = requests.get(image_url).content
-        with open(temp_path, "wb") as handler:
-            handler.write(img_data)
-        return image_id  # Save this as the image_id in your DB/draft
-
-        # response = self.client.images.generate(
-        #     model="dall-e-3",
-        #     prompt=prompt,
-        #     size="1024x1024",
-        #     quality="standard",
-        #     n=1
-        # )
+        # response = await fall_ai_image_generator(prompt,style,negative_prompt)
+        # image_url = response
+        # image_id = f"{uuid.uuid4()}.png"
+        # temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+        # os.makedirs(temp_dir, exist_ok=True)
+        # temp_path = os.path.join(temp_dir, image_id)
+        # img_data = requests.get(image_url).content
+        # with open(temp_path, "wb") as handler:
+        #     handler.write(img_data)
+        # return image_id  # Save this as the image_id in your DB/draft
+        print(f"\n\n here are \n\n\n")
+        response = self.client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            # size="1024x1024",
+            # quality="standard",
+            # n=1
+        )
         # Extract the image URL from the response
         print(f"Image Response = {response}")
-        return response
-        if hasattr(response, "data") and response.data and hasattr(response.data[0], "url"):
-            image_url = response.data[0].url
-            image_id = f"{uuid.uuid4()}.png"
-            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-            os.makedirs(temp_dir, exist_ok=True)
-            temp_path = os.path.join(temp_dir, image_id)
-            img_data = requests.get(image_url).content
-            with open(temp_path, "wb") as handler:
-                handler.write(img_data)
-            return image_id  # Save this as the image_id in your DB/draft
+        # return response
+        if hasattr(response, "data") and response.data:
+            # Check if we have base64 data (newer API format)
+            if hasattr(response.data[0], "b64_json") and response.data[0].b64_json:
+                import base64
+                image_id = f"{uuid.uuid4()}.png"
+                temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+                os.makedirs(temp_dir, exist_ok=True)
+                temp_path = os.path.join(temp_dir, image_id)
+                
+                # Decode base64 data and save
+                img_data = base64.b64decode(response.data[0].b64_json)
+                with open(temp_path, "wb") as handler:
+                    handler.write(img_data)
+                return image_id
+            # Fallback to URL format (older API format)
+            elif hasattr(response.data[0], "url") and response.data[0].url:
+                image_url = response.data[0].url
+                image_id = f"{uuid.uuid4()}.png"
+                temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
+                os.makedirs(temp_dir, exist_ok=True)
+                temp_path = os.path.join(temp_dir, image_id)
+                img_data = requests.get(image_url).content
+                with open(temp_path, "wb") as handler:
+                    handler.write(img_data)
+                return image_id
         else:
             return None
 

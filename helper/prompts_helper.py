@@ -12,8 +12,17 @@ Return ONLY structured JSON with the following format:
 
 {
   "background": {
-    "color": "white | dark blue | gradient | etc.",
-    "pattern": "none | subtle waves | diagonal lines | etc."
+    "colors": [
+      {
+        "color": "rgba(255, 255, 255, 1) | rgba(0, 0, 128, 1) | etc.",
+        "position_pct": [X%, Y%] // position where color starts, for gradients
+      }
+    ],
+    "pattern": {
+      "type": "none | subtle waves | diagonal lines | etc.",
+      "color": "rgba(0, 0, 0, 0.1) | etc.", // pattern overlay color
+      "opacity": %opacity_of_pattern // pattern opacity in percent
+    }
   },
   "aspect_ratio": "4:5 | 1:1 | 16:9 | etc.",
   "blocks": [
@@ -24,9 +33,9 @@ Return ONLY structured JSON with the following format:
       "font_family": "sans | serif",
       "font_weight": 400 | 600 | 800,
       "case": "uppercase | titlecase | normal",
-      "color": "white | black | coral | etc.",
+      "color": "rgba(255, 255, 255, 1) | rgba(0, 0, 0, 1) | etc.",
       "align": "left | center | right",
-      "anchor_xy_pct": [X%, Y%],       // top-left anchor of block
+      "anchor_xy_pct": [X%, Y%], // top-left anchor of block
       "width_pct": %width_of_text_block,
       "line_height_pct": %line_height_relative_to_font,
       "max_chars_per_line": approximate_max,
@@ -34,7 +43,18 @@ Return ONLY structured JSON with the following format:
     },
     {
       "id": "SUBTEXT",
-      ...
+      "role": "headline | subheading | description",
+      "variables": ["{SUBTEXT_LINE_1}"],
+      "font_family": "sans | serif",
+      "font_weight": 400 | 600 | 800,
+      "case": "uppercase | titlecase | normal",
+      "color": "rgba(255, 255, 255, 1) | rgba(0, 0, 0, 1) | etc.",
+      "align": "left | center | right",
+      "anchor_xy_pct": [X%, Y%], // top-left anchor of block
+      "width_pct": %width_of_text_block,
+      "line_height_pct": %line_height_relative_to_font,
+      "max_chars_per_line": approximate_max,
+      "effects": ["shadow", "stroke", "outline", "none"]
     }
   ],
   "effects": {
@@ -43,7 +63,6 @@ Return ONLY structured JSON with the following format:
   },
   "negative_elements": ["icons", "logos", "images", "URLs"]
 }
-
 Additional rules:
 
 - Only describe text-based layout and design.
