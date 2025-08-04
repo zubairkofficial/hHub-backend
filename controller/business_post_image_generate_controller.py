@@ -59,7 +59,6 @@ async def build_prompt(image_no, post_data, image_type):
         f"Maintain the same number of objects as in the reference image. "
         f"If the reference image contains human objects and the design style is '{image_design}' starting with 'realistic_image', "
         f"replace the human objects with new human figures that are relevant to the title and description (e.g., if the title is 'Family Picnic', "
-        f"replace a single person with a group of people at a picnic). "
         f"For non-human objects, replace with contextually relevant objects (e.g., replace a car with a bicycle for a title about cycling, "
         f"a tree with a flower for a gardening theme, or a book with a laptop for a tech theme).\n"
     )
@@ -69,10 +68,12 @@ async def build_prompt(image_no, post_data, image_type):
         prompt = (
             f"{object_replacement_instruction}\n"
             f"Match the visual style of the reference — {image_design} ({design_description}).\n"
-            f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n"
+            f"Do **not** change the original background. The background color, pattern, and style must remain exactly as in the reference image.\n"
+            f"Design Style: {image_design} ({design_description})\n"
             f"Do not add any textual elements, logos, or URLs. Keep the design clean, modern, and visually meaningful.\n"
             f"Additional Instructions: {instruction}\n"
         )
+            # f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n"
 
     # **Prompt for text_only**: Only text content (no images)
     elif image_type == "text_only":
@@ -96,6 +97,7 @@ async def build_prompt(image_no, post_data, image_type):
             f"   - Title: '{title}'\n"
             f"   - Description: '{description}'\n\n"
             f"2. Replace the detected objects with new ones as described above, maintaining the same number of objects.\n\n"
+            f"Do **not** change the original background. The background color, pattern, and style must remain exactly as in the reference image.\n"
             f"The new image should preserve the original design's layout, background, color palette, typography, font size, and spacing. "
             f"The new title and description should be clearly visible and integrated into the image as styled text, just like in the original.\n"
             f"Match the visual style of the reference — {image_design} ({design_description}).\n"
