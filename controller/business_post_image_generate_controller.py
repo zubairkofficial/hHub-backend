@@ -12,7 +12,9 @@ from models.image_generation_setting import ImageGenerationSetting
 from models.post_settings import PostSettings
 from helper.post_setting_helper import get_settings
 from openai import OpenAI
-from helper.helper import get_image_path, image_to_base64,save_base64_image
+from helper.helper import get_image_path, image_to_base64, save_base64_image
+from helper.design_styles import design_styles  # Import design_styles
+
 router = APIRouter()
 
 class GenerateImageForPostRequest(BaseModel):
@@ -21,7 +23,6 @@ class GenerateImageForPostRequest(BaseModel):
     image_design: str
     instruction: str
     image_type: str
-
 
 async def get_user_refference_images(request):
     """Fetch settings for the user and image generation."""
@@ -36,37 +37,40 @@ async def get_user_refference_images(request):
     num_images = setting.num_images if setting else 1
     return settings, num_images
 
-
-    # **Prompt for image_only**: Only visual content (no text)
 async def build_prompt(image_no, post_data, image_type):
     """Build the image generation prompt based on various inputs."""
     title = post_data.get('title', '')
     description = post_data.get('description', '')
     content = post_data.get('content', '')
-    image_design = post_data.get('image_design', '')  # Added image_design
-    instruction = post_data.get('instruction', '')  # Added instruction
+    image_design = post_data.get('image_design', 'realistic_image')  # Default to realistic_image
+    instruction = post_data.get('instruction', '')
 
-    # Define possible image designs and their meanings
-    design_styles = {
-        "realistic_image": "Realistic photography of humans, objects, or environments, with natural lighting and lifelike details.",
-        "digital_illustration": "Hand-drawn or digitally created illustrations, with stylized artwork and vibrant colors.",
-        "vector_illustration": "Flat, graphic vector art, often with clean lines and solid colors, typically used in logos and modern designs."
-    }
+    # Validate image_design
+    if image_design not in design_styles:
+        image_design = "realistic_image"  # Fallback to default
+    design_description = design_styles.get(image_design)
 
-    # Default design style if not found
-    design_description = design_styles.get(image_design, "A general visual design style (can be realistic, illustrative, or vector-based)")
+    # Common object replacement instruction
+    object_replacement_instruction = (
+        f"Analyze the reference image to detect the number of primary objects (e.g., one object, two objects, etc.). "
+        f"Replace the detected objects with new objects that visually represent the context of:\n"
+        f"Title: '{title}'\n"
+        f"Description: '{description}'\n"
+        f"Maintain the same number of objects as in the reference image. "
+        f"If the reference image contains human objects and the design style is '{image_design}' starting with 'realistic_image', "
+        f"replace the human objects with new human figures that are relevant to the title and description (e.g., if the title is 'Family Picnic', "
+        f"replace a single person with a group of people at a picnic). "
+        f"For non-human objects, replace with contextually relevant objects (e.g., replace a car with a bicycle for a title about cycling, "
+        f"a tree with a flower for a gardening theme, or a book with a laptop for a tech theme).\n"
+    )
 
     # **Prompt for image_only**: Only visual content (no text)
     if image_type == "image_only":
         prompt = (
-            f"Analyze the reference image. If it contains any text (title, heading, description, or labels), "
-            f"generate a new version of the image that excludes all text. "
-            f"Instead, add icons or images that visually represent the following:\n\n"
-            f"Title context: '{title}'\n"
-            f"Description context: '{description}'\n\n"
+            f"{object_replacement_instruction}\n"
             f"Match the visual style of the reference — {image_design} ({design_description}).\n"
-            f"Ensure the image looks realistic or fitting to the specified design style. "
-            f"Do not add any textual elements, logos, or URLs. Keep the design clean, modern, and visually meaningful.\n\n"
+            f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n"
+            f"Do not add any textual elements, logos, or URLs. Keep the design clean, modern, and visually meaningful.\n"
             f"Additional Instructions: {instruction}\n"
         )
 
@@ -86,21 +90,21 @@ async def build_prompt(image_no, post_data, image_type):
     # **Prompt for both text and image**: Replace both text and visuals
     else:  # if image_type is both or any other variant
         prompt = (
-            f"Analyze the reference image and generate a new version that replaces both the text and visual elements with new content.\n\n"
+            f"{object_replacement_instruction}\n"
+            f"Generate a new version that replaces both the text and visual elements with new content:\n\n"
             f"1. Replace the existing title and description with:\n"
             f"   - Title: '{title}'\n"
             f"   - Description: '{description}'\n\n"
-            f"2. Replace any existing icons, images, or illustrations with new ones that are visually relevant to the new text.\n\n"
+            f"2. Replace the detected objects with new ones as described above, maintaining the same number of objects.\n\n"
             f"The new image should preserve the original design's layout, background, color palette, typography, font size, and spacing. "
             f"The new title and description should be clearly visible and integrated into the image as styled text, just like in the original.\n"
+            f"Match the visual style of the reference — {image_design} ({design_description}).\n"
+            f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n"
             f"Do not add logos, QR codes, URLs, or unrelated decorative elements.\n\n"
-            f"Design Style: {image_design} ({design_description})\n"
             f"Additional Instructions: {instruction}\n"
         )
 
     return prompt
-
-
 
 async def replace_text_and_visuals(prompt, image_filename):
     """Replace both text and visuals using OpenAI API."""
@@ -131,13 +135,12 @@ async def replace_text_and_visuals(prompt, image_filename):
             raise HTTPException(status_code=500, detail="No image output returned")
 
         result_b64 = image_calls[0].result
-        image_name = save_base64_image(result_b64,'temp_images')
+        image_name = save_base64_image(result_b64, 'temp_images')
 
         return {"image_id": image_name}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest, image_no: int = Query(0)):
@@ -154,8 +157,8 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         if not reference_layout:
             raise HTTPException(status_code=404, detail="No reference layout found for the image type.")
         
-        if reference_layout.get('image_filename',''):
-            print(f"reference image name is = {reference_layout.get('image_filename','')}")
+        if reference_layout.get('image_filename', ''):
+            print(f"reference image name is = {reference_layout.get('image_filename', '')}")
             image_filename = reference_layout['image_filename']
         else:
             raise HTTPException(status_code=404, detail="No reference layout found for the image type not found image_filename.")
