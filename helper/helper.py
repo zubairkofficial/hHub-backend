@@ -1,6 +1,8 @@
 import os
 import uuid
 import base64
+from io import BytesIO
+from PIL import Image
 
 def get_image_path(folder_name: str, image_name: str) -> str:
     """
@@ -38,7 +40,7 @@ def image_to_base64(image_path: str) -> str:
     return f"data:{mime_type};base64,{encoded_string}"
 
     
-def save_base64_image(base64_image: str, save_dir: str,file_extension:str = "png") -> str:
+def save_base64_image_original(base64_image: str, save_dir: str,file_extension:str = "png") -> str:
     """
     This function takes a base64 encoded image, decodes it, saves it to the specified directory,
     and returns the image ID (UUID) along with the file extension. If no extension is provided,
@@ -79,3 +81,54 @@ def save_base64_image(base64_image: str, save_dir: str,file_extension:str = "png
 
     except Exception as e:
         raise Exception(f"Error saving the base64 image: {e}")
+
+def save_base64_image(base64_image: str, save_dir: str, reference_image_path: str, file_extension: str = "png") -> str:
+    """
+    Decodes a base64 image, resizes it to match the reference image's dimensions, saves it to the specified directory,
+    and returns the image ID along with the file extension.
+
+    :param base64_image: Base64 encoded image string
+    :param save_dir: Directory where the image should be saved
+    :param reference_image_path: Path to the reference image for dimension matching
+    :param file_extension: Desired file extension (default is 'png')
+    :return: Image ID and extension
+    """
+    try:
+        original_image = save_base64_image_original(base64_image,save_dir)
+        print(f"Original Image = {original_image}")
+        # Check if the directory exists, create if not
+        # if not os.path.exists(save_dir):
+        #     os.makedirs(save_dir)
+
+        # # Decode the base64 image
+        # image_data = base64.b64decode(base64_image.split(",", 1)[-1])
+        # image = Image.open(BytesIO(image_data))
+
+        # # Get dimensions of the reference image
+        # ref_width, ref_height = get_aspect_ratio(reference_image_path)
+
+        # # Resize the image to match the reference image's dimensions
+        # resized_image = image.resize((ref_width, ref_height), Image.LANCZOS)
+
+        # # Generate a unique image ID
+        # image_id = str(uuid.uuid4())
+
+        # # Construct the file path
+        # filename = f"{image_id}.{file_extension}"
+        # filepath = os.path.join(save_dir, filename)
+
+        # # Save the resized image
+        # resized_image.save(filepath)
+
+        return original_image
+        # Return the image ID and extension
+        return f"{image_id}.{file_extension}"
+
+    except Exception as e:
+        raise Exception(f"Error processing and saving the base64 image: {e}")
+
+def get_aspect_ratio(image_path):
+    with Image.open(image_path) as img:
+        width, height = img.size
+        print(f"helper width= {width} and height = {height}")
+        return width,height
