@@ -25,7 +25,8 @@ TORTOISE_CONFIG = {
                 'models.post_draft',
                 'models.post_prompt_settings',
                 'models.image_settings',
-                'models.image_generation_setting'
+                'models.image_generation_setting',
+                'models.post_history',
             ],
             'default_connection': 'default'
         },

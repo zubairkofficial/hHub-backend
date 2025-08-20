@@ -1,6 +1,9 @@
 import time
 import httpx
 from dotenv import load_dotenv
+from models.lead_score import LeadScore
+from models.post_draft import PostDraft
+from models.business_post import BusinessPost
 import os
 import json
 
@@ -51,7 +54,22 @@ async def get_client_data(user_id: int):
                 print(f"Response data: {clinics}")
                 
                 if clinics.get('success', False):
+                    client_details = clinics['data'].get('clients', [])
+                    client_ids_from_api = [client['id'] for client in client_details]
+
+                    # Step 4: Fetch the LeadScore data for the extracted client_ids
+                    lead_scores = await LeadScore.filter(client_id__in=client_ids_from_api).all()
+                    print(f"Fetched lead scores: {lead_scores}")
+                    post_drafts = await PostDraft.filter(user_id=user_id).all()
+                    print(f"PostDrafts for user {user_id}: {post_drafts}")
+                    
+                    # Fetch BusinessPosts by user_id
+                    business_posts = await BusinessPost.filter(user_id=user_id).all()
+                    print(f"BusinessPosts for user {user_id}: {business_posts}")
                     # Cache the successful response
+                    clinics['data']['lead_scores'] = [score.to_dict() for score in lead_scores]  # Assuming you want to convert to dict
+                    clinics['data']['post_drafts'] = [draft.to_dict() for draft in post_drafts]
+                    clinics['data']['business_posts'] = [post.to_dict() for post in business_posts]
                     clinic_cache[user_id] = (clinics['data'], current_time)
                     return clinics['data']
                 else:
