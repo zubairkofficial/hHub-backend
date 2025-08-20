@@ -14,6 +14,8 @@ class LeadAnalysis(BaseModel):
     intent_score: float = Field(description="Score for customer intent (0-100)")
     urgency_score: float = Field(description="Score for urgency level (0-100)")
     overall_score: float = Field(description="Combined score (0-100)")
+    potential_score: float = Field(description="Score for Potential level (0-100)")
+    
     analysis_summary: str = Field(description="Comprehensive analysis incorporating all provided data")
 
 class LeadScoringService:
