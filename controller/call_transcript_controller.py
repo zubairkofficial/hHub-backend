@@ -84,46 +84,59 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
 
             # Group calls by phone number
             phone_groups = {}
+            skipped_phones = set()  # Track phones that should be skipped
+
+            # Perform phone existence check BEFORE processing the calls
             for call in filtered_calls:
                 phone_number = call.get("phone_number")
-                recording_url = call.get("call_recording")
-                is_processed = call.get("is_processed")
+                
+                # Print the phone number being processed
+                # print(f"Processing Phone Number: {phone_number}")
 
-                # First, check if the phone number exists in Laravel
-                laravel_api_url = f'{apiurl}/api/check-phone-number/{phone_number}'
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(laravel_api_url)
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('exists', False):  # If exists, skip processing for this number
-                            print(f"Phone number {phone_number} already exists in Laravel. Skipping.")
-                            active_sessions[session_id]['details'].append({
-                                'message': f"Phone number {phone_number} exists in Laravel. Skipped.",
-                                'status': 'skipped'
-                            })
-                            continue  # Skip this phone number and move to the next
+                # Check if phone number exists in Laravel
+                if phone_number not in skipped_phones:
+                    laravel_api_url = f'{apiurl}/api/check-phone-number/{phone_number}'
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(laravel_api_url)
+                        if response.status_code == 200:
+                            data = response.json()
+                            if data.get('exists', False):
+                                # Skip this phone number completely if it exists in Laravel
+                                print(f"Phone number {phone_number} already exists in Laravel. Skipping completely.")
+                                skipped_phones.add(phone_number)
+                                continue  # Skip further processing for this phone number
 
-                # Now determine the call type based on is_processed
-                if is_processed == 0:  # Not processed (missed)
-                    call_type = "miss"
-                else:  # Processed (received)
-                    call_type = "receive"
+                # Now process the call if it wasn't skipped
+                if phone_number not in skipped_phones:
+                    recording_url = call.get("call_recording")
+                    is_processed = call.get("is_processed")
+   # Check if the call was processed (1 means received, 0 means missed)
+                    if is_processed == 0:  # Not processed (missed)
+                        call_type = "miss"
+                    else:  # Processed (received)
+                        call_type = "receive"
+                        
+                         # Print out the phone number with its type
+                    # print(f"Phone Number: {phone_number}, Type: {call_type}")
 
-                # Skip if phone number or recording URL is missing
-                if not phone_number or not recording_url:
-                    continue
+                    # Skip if phone number or recording URL is missing
+                    # if not phone_number or not recording_url:
+                    #     continue
 
-                # Add call to phone groups if the phone number doesn't exist in Laravel
-                if phone_number not in phone_groups:
-                    phone_groups[phone_number] = {
-                        "calls": [],
-                        "transcriptions": [],
-                        "call_data": call,
-                        "type": call_type,  # Set the type (miss or receive)
-                        "potential_score": None  # Default value for potential_score
-                    }
 
-                phone_groups[phone_number]["calls"].append(call)
+                   
+                    # Perform phone existence check BEFORE processing (for both "miss" and "receive")
+                    if phone_number not in phone_groups:
+                        phone_groups[phone_number] = {
+                            "calls": [],
+                            "transcriptions": [],
+                            "call_data": call,
+                            "type": call_type,  # Set the type (miss or receive)
+                            "potential_score": None  # Default value for potential_score
+                        }
+
+                    # Add the call to the group (only reached if phone doesn't exist in Laravel or it's a missed call)
+                    phone_groups[phone_number]["calls"].append(call)
 
             # Process each phone number group
             FIXED_ACCOUNT_ID = "562206937"
@@ -148,7 +161,30 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                         'status': 'processing'
                     })
 
-                    # Get transcriptions for all calls from this phone number
+                    # If the call is missed, save it directly without checking for transcription
+                    if group_data["type"] == "miss":
+                        # Save as missed lead score with potential_score 0
+                        # print(f"Saving lead score as miss for phone number: {phone_number}")
+
+                        await LeadScore.create(
+                            client_id=group_data["call_data"].get("client_id"),
+                            callrail_id=group_data["call_data"].get("callrail_id"),
+                            name=group_data["call_data"].get("name"),
+                            phone=phone_number,
+                            type="miss",
+                            potential_score=0,  # You can set potential_score to 0 if there's no transcription
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        miss_results.append({
+                            "phone_number": phone_number,
+                            "type": "miss",
+                            "potential_score": 0,
+                            "message": "Created lead score as miss"
+                        })
+                        continue  # Skip to the next phone number
+
+                    # Process transcriptions for "receive" calls
                     transcription_tasks = [
                         transcribe_call(call.get("call_recording"))
                         for call in group_data["calls"]
@@ -163,25 +199,25 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                             'message': f'No valid transcriptions for {phone_number}',
                             'status': 'skipped'
                         })
-                        # If no transcription, mark as missed, but only if phone doesn't exist
-                        if not data.get('exists', False):  # Only save as "miss" if phone doesn't exist
-                            await LeadScore.create(
-                                client_id=group_data["call_data"].get("client_id"),
-                                callrail_id=group_data["call_data"].get("callrail_id"),
-                                name=group_data["call_data"].get("name"),
-                                phone=phone_number,
-                                type="miss",  # Type is "miss"
-                                potential_score=0,  # You can set potential_score to 0 if there’s no transcription
-                                created_at=datetime.now(),
-                                updated_at=datetime.now()
-                            )
-                            miss_results.append({
-                                "phone_number": phone_number,
-                                "type": "miss",
-                                "potential_score": 0,
-                                "message": "Created lead score as miss"
-                            })
-                        continue  # Skip further processing for missed calls
+                        # If no transcription, mark as missed
+                        # print(f"Saving lead score as miss for phone number: {phone_number} (no valid transcription)")
+                        await LeadScore.create(
+                            client_id=group_data["call_data"].get("client_id"),
+                            callrail_id=group_data["call_data"].get("callrail_id"),
+                            name=group_data["call_data"].get("name"),
+                            phone=phone_number,
+                            type="miss",
+                            potential_score=0,  # You can set potential_score to 0 if there's no transcription
+                            created_at=datetime.now(),
+                            updated_at=datetime.now()
+                        )
+                        miss_results.append({
+                            "phone_number": phone_number,
+                            "type": "miss",
+                            "potential_score": 0,
+                            "message": "Created lead score as miss"
+                        })
+                        continue
 
                     # Combine all transcriptions for this phone number
                     combined_transcription = "\n\n---\n\n".join(valid_transcriptions)
@@ -261,7 +297,6 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
             active_sessions[session_id]['status'] = 'completed'
             active_sessions[session_id]['processed'] = len(phone_groups)
 
-            # Return results
             return {
                 "status": "success",
                 "processed_phone_numbers": processed_count,

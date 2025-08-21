@@ -5,7 +5,6 @@ from models.lead_score import LeadScore
 from models.post_draft import PostDraft
 from models.business_post import BusinessPost
 import os
-import json
 
 load_dotenv()
 
@@ -55,22 +54,91 @@ async def get_client_data(user_id: int):
                 
                 if clinics.get('success', False):
                     client_details = clinics['data'].get('clients', [])
-                    client_ids_from_api = [client['id'] for client in client_details]
+                    print(f"get 1st client_details = {client_details}")
+                    
+                    # Ensure 'logged_in_user_whose_asked_questions_or_chat' exists and is not empty
+                    user_client_id = clinics['data'].get('logged_in_user_whose_asked_questions_or_chat', {})
+                    print(f"get 2nd client_details = {user_client_id}")
+                    
+                    # Safely extract the 'client_id' from the 'logged_in_user_whose_asked_questions_or_chat' object
+                    if user_client_id:
+                        client_id = user_client_id.get('client_id', None)
+                        print(f"User client_id: {client_id}")
+                    else:
+                        client_id = None
+                        print("No user data available for 'logged_in_user_whose_asked_questions_or_chat'.")
 
-                    # Step 4: Fetch the LeadScore data for the extracted client_ids
-                    lead_scores = await LeadScore.filter(client_id__in=client_ids_from_api).all()
+                    # Check if client_details list is empty
+                    if client_details:
+                        client_ids_from_api = [client['id'] for client in client_details if 'id' in client]
+                        print(f"get 3rd client_details = {client_ids_from_api}")
+                    else:
+                        print("No client details found.")
+                        client_ids_from_api = []
+
+                    # Step 4: Fetch the LeadScore data for the extracted client_ids (if any)
+                    lead_scores = await LeadScore.filter(client_id=client_id).all()
                     print(f"Fetched lead scores: {lead_scores}")
+
+                    # Convert LeadScore objects into dictionaries manually
+                    lead_scores_dict = [
+                        {
+                            "id": score.id,
+                            "client_id": score.client_id,
+                            "callrail_id": score.callrail_id,
+                            "analysis_summary": score.analysis_summary,
+                            "intent_score": score.intent_score,
+                            "urgency_score": score.urgency_score,
+                            "overall_score": score.overall_score,
+                            "name": score.name,
+                            "type": score.type,
+                            "potential_score": score.potential_score
+                        }
+                        for score in lead_scores
+                    ]
+                    print(f"Lead scores converted to dict: {lead_scores_dict}")
+
+                    # Fetch PostDraft data
                     post_drafts = await PostDraft.filter(user_id=user_id).all()
                     print(f"PostDrafts for user {user_id}: {post_drafts}")
-                    
+
+                    # Convert PostDraft objects into dictionaries manually
+                    post_drafts_dict = [
+                        {
+                            "id": draft.id,
+                            "user_id": draft.user_id,
+                            "current_step": draft.current_step,
+                            "content": draft.content,
+                            "title": draft.title,
+                            "description": draft.description,
+                            "keywords": draft.keywords,
+                            "post_options": draft.post_options,
+                            "selected_post_index": draft.selected_post_index,
+                            "image_ids": draft.image_ids,
+                            "status": draft.status,
+                            "selected_image_id": draft.selected_image_id,
+                            "is_complete": draft.is_complete,
+                            "created_at": draft.created_at,
+                            "posted_at": draft.posted_at,
+                            "updated_at": draft.updated_at,
+                        }
+                        for draft in post_drafts
+                    ]
+                    print(f"PostDrafts converted to dict: {post_drafts_dict}")
+
                     # Fetch BusinessPosts by user_id
                     business_posts = await BusinessPost.filter(user_id=user_id).all()
                     print(f"BusinessPosts for user {user_id}: {business_posts}")
-                    # Cache the successful response
-                    clinics['data']['lead_scores'] = [score.to_dict() for score in lead_scores]  # Assuming you want to convert to dict
-                    clinics['data']['post_drafts'] = [draft.to_dict() for draft in post_drafts]
+
+                    # Add the fetched data to the clinics dictionary
+                    clinics['data']['lead_scores'] = lead_scores_dict
+                    clinics['data']['post_drafts'] = post_drafts_dict
                     clinics['data']['business_posts'] = [post.to_dict() for post in business_posts]
+                    
+                    # Cache the successful response
                     clinic_cache[user_id] = (clinics['data'], current_time)
+                    
+                    # Return the updated data
                     return clinics['data']
                 else:
                     print(f"Laravel API returned success=false: {clinics}")
