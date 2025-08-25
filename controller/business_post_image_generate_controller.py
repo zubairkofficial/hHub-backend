@@ -243,6 +243,7 @@ async def replace_text_and_visuals(prompt, image_filename):
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest, image_no: int = Query(0)):
     try:
+        error
         # Fetch settings
         settings, num_images = await get_user_refference_images(request)
         
