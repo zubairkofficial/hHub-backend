@@ -69,245 +69,174 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
             'details': [],
             'status': 'processing'
         }
-
+        
         # Fetch call data for the specific client IDs
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{apiurl}/api/transcript", headers=headers)
+            response = await client.get(f"{apiurl}/api/transcript",headers=headers)
             call_data = response.json()
-
+            
             # Filter calls by client_ids
             filtered_calls = [
                 call for call in call_data.get("data", [])
                 if call.get("client_id") in client_ids
             ]
             active_sessions[session_id]['total'] = len(filtered_calls)
-
-            # Group calls by phone number
+            
+             # Group calls by phone number
             phone_groups = {}
-            skipped_phones = set()  # Track phones that should be skipped
-
-            # Perform phone existence check BEFORE processing the calls
             for call in filtered_calls:
                 phone_number = call.get("phone_number")
+                recording_url = call.get("call_recording")
+
+                # Skip if phone number or recording URL is missing
+                if not phone_number or not recording_url:
+                    
+                    continue
+
+                # Check if the phone number exists in the Laravel system
+                laravel_api_url = f'{apiurl}/api/check-phone-number/{phone_number}'
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(laravel_api_url)
+                    print(f"laravel_api_url api call")
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('exists', False):
+                            # Skip this phone number if it exists in Laravel
+                            continue
+                if phone_number not in phone_groups:
+                    phone_groups[phone_number] = {
+                        "calls": [],
+                        "transcriptions": [],
+                        "call_data": call
+                    }
                 
-                # Print the phone number being processed
-                # print(f"Processing Phone Number: {phone_number}")
-
-                # Check if phone number exists in Laravel
-                if phone_number not in skipped_phones:
-                    laravel_api_url = f'{apiurl}/api/check-phone-number/{phone_number}'
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(laravel_api_url)
-                        if response.status_code == 200:
-                            data = response.json()
-                            if data.get('exists', False):
-                                # Skip this phone number completely if it exists in Laravel
-                                print(f"Phone number {phone_number} already exists in Laravel. Skipping completely.")
-                                skipped_phones.add(phone_number)
-                                continue  # Skip further processing for this phone number
-
-                # Now process the call if it wasn't skipped
-                if phone_number not in skipped_phones:
-                    recording_url = call.get("call_recording")
-                    is_processed = call.get("is_processed")
-   # Check if the call was processed (1 means received, 0 means missed)
-                    if is_processed == 0:  # Not processed (missed)
-                        call_type = "miss"
-                    else:  # Processed (received)
-                        call_type = "receive"
-                        
-                         # Print out the phone number with its type
-                    # print(f"Phone Number: {phone_number}, Type: {call_type}")
-
-                    # Skip if phone number or recording URL is missing
-                    # if not phone_number or not recording_url:
-                    #     continue
-
-
-                   
-                    # Perform phone existence check BEFORE processing (for both "miss" and "receive")
-                    if phone_number not in phone_groups:
-                        phone_groups[phone_number] = {
-                            "calls": [],
-                            "transcriptions": [],
-                            "call_data": call,
-                            "type": call_type,  # Set the type (miss or receive)
-                            "potential_score": None  # Default value for potential_score
-                        }
-
-                    # Add the call to the group (only reached if phone doesn't exist in Laravel or it's a missed call)
-                    phone_groups[phone_number]["calls"].append(call)
-
+                phone_groups[phone_number]["calls"].append(call)
+            
             # Process each phone number group
             FIXED_ACCOUNT_ID = "562206937"
             processed_count = 0
-
-            # Create two lists to separate receive and miss types
-            receive_results = []
-            miss_results = []
-
+            
             async def transcribe_call(recording_url):
                 call_id = extract_call_id_from_url(recording_url)
                 if not call_id:
                     return None
                 result = await processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
                 return result['transcription'] if result and 'transcription' in result and result['transcription'] else None
-
+            
             for phone_number, group_data in phone_groups.items():
+                print("in for loop ")
                 try:
                     # Update progress
                     active_sessions[session_id]['details'].append({
                         'message': f'Processing phone number: {phone_number}',
                         'status': 'processing'
                     })
-
-                    # If the call is missed, save it directly without checking for transcription
-                    if group_data["type"] == "miss":
-                        # Save as missed lead score with potential_score 0
-                        # print(f"Saving lead score as miss for phone number: {phone_number}")
-
-                        await LeadScore.create(
-                            client_id=group_data["call_data"].get("client_id"),
-                            callrail_id=group_data["call_data"].get("callrail_id"),
-                            name=group_data["call_data"].get("name"),
-                            phone=phone_number,
-                            type="miss",
-                            potential_score=0,  # You can set potential_score to 0 if there's no transcription
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-                        miss_results.append({
-                            "phone_number": phone_number,
-                            "type": "miss",
-                            "potential_score": 0,
-                            "message": "Created lead score as miss"
-                        })
-                        continue  # Skip to the next phone number
-
-                    # Process transcriptions for "receive" calls
+                    
+                    # Get transcriptions for all calls from this phone number
                     transcription_tasks = [
                         transcribe_call(call.get("call_recording"))
                         for call in group_data["calls"]
                         if call.get("call_recording")
                     ]
-
+                    
                     transcriptions = await asyncio.gather(*transcription_tasks)
                     valid_transcriptions = [t for t in transcriptions if t and isinstance(t, str) and t.strip()]
-
+                    
                     if not valid_transcriptions:
+                        print("the transcipt is not valid")
                         active_sessions[session_id]['details'].append({
                             'message': f'No valid transcriptions for {phone_number}',
                             'status': 'skipped'
                         })
-                        # If no transcription, mark as missed
-                        # print(f"Saving lead score as miss for phone number: {phone_number} (no valid transcription)")
-                        await LeadScore.create(
-                            client_id=group_data["call_data"].get("client_id"),
-                            callrail_id=group_data["call_data"].get("callrail_id"),
-                            name=group_data["call_data"].get("name"),
-                            phone=phone_number,
-                            type="miss",
-                            potential_score=0,  # You can set potential_score to 0 if there's no transcription
-                            created_at=datetime.now(),
-                            updated_at=datetime.now()
-                        )
-                        miss_results.append({
-                            "phone_number": phone_number,
-                            "type": "miss",
-                            "potential_score": 0,
-                            "message": "Created lead score as miss"
-                        })
                         continue
-
+                    
                     # Combine all transcriptions for this phone number
                     combined_transcription = "\n\n---\n\n".join(valid_transcriptions)
-
+                    
                     # Check if lead score already exists for this phone number
                     existing_lead_score = await LeadScore.filter(phone=phone_number).first()
 
+                    # Check if a record is found
+                    if existing_lead_score:
+                        # Print the details you need from the existing lead score
+                        print(f"Existing Lead Score Details:")
+                        print(f"ID: {existing_lead_score.id}")
+                        print(f"Client ID: {existing_lead_score.client_id}")
+                        print(f"Name: {existing_lead_score.name}")
+                    else:
+                        print("No existing lead score found for this phone number.")
+
+                    # Get the most recent call data for context
+                    recent_call = group_data["calls"][-1]
+                    print("genrette summary")
                     # Generate analysis summary
                     summary_response = await db.scoring_service.generate_summary(
                         transcription=combined_transcription,
-                        client_type=group_data["call_data"].get("client_type"),
-                        service=group_data["call_data"].get("service"),
-                        state=group_data["call_data"].get("state"),
-                        city=group_data["call_data"].get("city"),
-                        first_call=group_data["call_data"].get("first_call"),
-                        rota_plan=group_data["call_data"].get("rota_plan"),
+                        client_type=recent_call.get("client_type"),
+                        service=recent_call.get("service"),
+                        state=recent_call.get("state"),
+                        city=recent_call.get("city"),
+                        first_call=recent_call.get("first_call"),
+                        rota_plan=recent_call.get("rota_plan"),
                         previous_analysis=existing_lead_score.analysis_summary if existing_lead_score else None
                     )
                     analysis_summary = summary_response['summary']
-
+                    
                     # Get scores for the analysis
                     scores = await db.scoring_service.score_summary(analysis_summary)
-
-                    # Update or create lead score record with type as "receive" and potential_score
+                    print(f"score of this lead {scores}")
+                    # Update or create lead score record
+                    print("update or create ")
                     if existing_lead_score:
+                        print("lead is exist and updating it")
                         await LeadScore.filter(id=existing_lead_score.id).update(
                             analysis_summary=analysis_summary,
                             intent_score=scores.intent_score,
                             urgency_score=scores.urgency_score,
                             overall_score=scores.overall_score,
-                            potential_score=scores.potential_score,
-                            type="receive",  # Set type to "receive"
                             updated_at=datetime.now()
                         )
                         message = f"Updated lead score for {phone_number}"
                     else:
+                        print("no lead so create new one")
                         await LeadScore.create(
-                            client_id=group_data["call_data"].get("client_id"),
-                            callrail_id=group_data["call_data"].get("callrail_id"),
-                            name=group_data["call_data"].get("name"),
-                            phone=phone_number,
+                            client_id=recent_call.get("client_id"),
+                            callrail_id=None,
+                            name=recent_call.get("name"),
                             analysis_summary=analysis_summary,
+                            phone=phone_number,
                             intent_score=scores.intent_score,
                             urgency_score=scores.urgency_score,
                             overall_score=scores.overall_score,
-                            potential_score=scores.potential_score,
-                            type="receive",  # Set type to "receive"
                             created_at=datetime.now(),
                             updated_at=datetime.now()
                         )
                         message = f"Created lead score for {phone_number}"
-
+                    
                     processed_count += 1
-
+                    
                     # Update progress
                     active_sessions[session_id]['processed'] = processed_count
                     active_sessions[session_id]['details'].append({
                         'message': message,
                         'status': 'completed'
                     })
-
-                    # Add result to the receive list
-                    receive_results.append({
-                        "phone_number": phone_number,
-                        "type": "receive",
-                        "potential_score": scores.potential_score,
-                        "message": message
-                    })
-
+                    
                 except Exception as e:
                     active_sessions[session_id]['details'].append({
                         'message': f'Error processing {phone_number}: {str(e)}',
                         'status': 'error'
                     })
-
+            
             # Mark as completed
             active_sessions[session_id]['status'] = 'completed'
             active_sessions[session_id]['processed'] = len(phone_groups)
-
-            return {
-                "status": "success",
-                "processed_phone_numbers": processed_count,
-                "receive_results": receive_results,
-                "miss_results": miss_results
-            }
-
+            
     except Exception as e:
         # Mark as error
         active_sessions[session_id]['status'] = 'error'
         active_sessions[session_id]['error'] = str(e)
+
 
 
 @router.post("/process-user-clients")
@@ -518,12 +447,9 @@ async def get_call_data():
                     else:
                         # Create new record
                         await LeadScore.create(
-                            client_id=recent_call.get("client_id"),
-                            name=recent_call.get("name"),
-                            callrail_id=recent_call.get("callrail_id"),
-                            
-                            # callrail_id=None,
-
+                            client_id=recent_call.get("client_id"),  
+                            callrail_id=None,
+                            name = recent_call.get("name"),
                             analysis_summary=analysis_summary,
                             phone=phone_number,
                             intent_score=scores.intent_score,
@@ -641,8 +567,6 @@ async def re_score_lead(leadId: str):
             intent_score=updated_scores.intent_score,
             urgency_score=updated_scores.urgency_score,
             overall_score=updated_scores.overall_score,
-            potential_score=updated_scores.potential_score,
-            
             updated_at=datetime.now()
         )
         print(f"Lead score updated successfully for ID: {leadId}")
@@ -655,8 +579,7 @@ async def re_score_lead(leadId: str):
                 "analysis_summary": new_analysis_summary,
                 "intent_score": updated_scores.intent_score,
                 "urgency_score": updated_scores.urgency_score,
-                "overall_score": updated_scores.overall_score,
-                "potential_score" : updated_scores.potential_score
+                "overall_score": updated_scores.overall_score
             }
         }
 

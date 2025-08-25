@@ -96,6 +96,7 @@ def save_base64_image(base64_image: str, save_dir: str, reference_image_path: st
     try:
         original_image = save_base64_image_original(base64_image,save_dir)
         print(f"Original Image = {original_image}")
+        # resize image
         # Check if the directory exists, create if not
         # if not os.path.exists(save_dir):
         #     os.makedirs(save_dir)
