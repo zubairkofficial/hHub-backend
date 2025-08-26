@@ -27,8 +27,11 @@ from pydantic import BaseModel
 import base64
 from openai import OpenAI
 import re
+import math
 import time
 import uuid
+from tortoise.expressions import Q
+
 
 router = APIRouter()
 
@@ -96,7 +99,24 @@ class BusinessPostResponse(BaseModel):
     title: Optional[str] = None
     image_id: Optional[str] = None
     is_complete: Optional[bool] = None
+class PostResponse(BaseModel):
+    id: int
+    post: str
+    status: str
+    created_at: str
+    title: Optional[str] = None
+    image_id: Optional[str] = None
+    is_complete: Optional[bool] = None
 
+class PaginationInfo(BaseModel):
+    page: int
+    per_page: int
+    total: int
+    pages: int
+
+class PaginatedResponse(BaseModel):
+    data: List
+    pagination: PaginationInfo
 
 class PostSettingsResponse(BaseModel):
     id: int
@@ -271,50 +291,96 @@ async def get_post_settings(user_id: int = Query(...)):
 
 
 @router.get("/posts")
-async def get_all_posts(user_id: Optional[int] = Query(None, description="User ID to filter posts")):
+async def get_all_posts(
+    user_id: Optional[int] = Query(None, description="User ID to filter posts"),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(10, ge=1, le=100, description="Items per page"),
+    search: Optional[str] = Query(None),  # New
+    status: Optional[str] = Query(None)   # New
+):
     try:
+        # Calculate offset for pagination
+        offset = (page - 1) * per_page
+        
+        # Build base query
         if user_id is not None:
-            posts = await BusinessPost.filter(user_id=user_id).order_by('-created_at')
-            print(f"post get = {posts}")
-            drafts = await PostDraft.filter(user_id=user_id).order_by('-created_at')
+            base_query = PostDraft.filter(user_id=user_id)
         else:
-            posts = await BusinessPost.all().order_by('-created_at')
-            drafts = await PostDraft.all().order_by('-created_at')
-        result = [
-            BusinessPostResponse(
-                id=post.id,
-                post=post.post,
-                status=post.status,
-                created_at=post.created_at.isoformat(),
-                image_id=getattr(post, 'image_id', None),
-                is_complete=False
-            ) for post in posts
-        ]
-        print(f"results get = {result}")
+            base_query = PostDraft.all()
+        
+        # Apply search filter if provided
+        if search and search.strip():
+            search_term = search.lower().strip()
+            base_query = base_query.filter(
+                Q(content__icontains=search_term) |
+                Q(title__icontains=search_term) |
+                Q(description__icontains=search_term) |
+                Q(status__icontains=search_term)
+            )
+        
+        # Apply status filter if provided
+        if status and status.strip():
+            status_list = [s.strip().lower() for s in status.split(',')]
+            base_query = base_query.filter(
+                Q(status__icontains=status_list) 
+                # Q(post_options__icontains=search_term)
+            )
+        
+        # Get total count for pagination
+        total_drafts = await base_query.count()
+        
+        # Get paginated results
+        drafts = await base_query.order_by('-created_at').offset(offset).limit(per_page)
+
+        # Process drafts
+        result = []
+        
         for draft in drafts:
-            draft = await PostDraft.get(id=draft.id)
             post_data = None
+            title_data = None
+            
             if draft.post_options and draft.selected_post_index is not None and 0 <= draft.selected_post_index < len(draft.post_options):
                 post_data = draft.post_options[draft.selected_post_index]
             else:
+                print(f"in else = {draft.content}")
                 post_data = draft.content
+                
+            # Determine status based on is_complete
+            post_status = "published" if draft.is_complete else "draft"
                 
             result.append({
                 "id": draft.id,
-                "post": post_data or "",
-                "status": "draft",
-                "created_at": draft.created_at.isoformat(),
+                "post": post_data,
+                "status": post_status,
+                "created_at": draft.created_at.isoformat() if draft.created_at else "",
+                "title": title_data,
                 "image_id": getattr(draft, 'selected_image_id', None),
                 "is_complete": draft.is_complete,
-                "current_step": draft.current_step,
-                "created_at": draft.created_at.isoformat() if draft.created_at else None,
-                "posted_at": draft.posted_at.isoformat() if draft.posted_at else None
+                "posted_at" : draft.posted_at
             })
-        result.sort(key=lambda x: x["created_at"] if isinstance(x, dict) else x.created_at, reverse=True)
-        print(f"result of the send user posts {result}")
-        return result
+        
+        # Sort by created_at (most recent first)
+        result.sort(key=lambda x: x["created_at"], reverse=True)
+        
+        # Calculate pagination info
+        total_pages = math.ceil(total_drafts / per_page) if total_drafts > 0 else 0
+        
+        # Create pagination response
+        pagination_info = PaginationInfo(
+            page=page,
+            per_page=per_page,
+            total=total_drafts,
+            pages=total_pages
+        )
+        
+        return PaginatedResponse(
+            data=result,
+            pagination=pagination_info
+        )
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching posts: {str(e)}")
+
 
 def display_image_helper(image_id):
     return BusinessPostHelper.display_image_helper(image_id)
