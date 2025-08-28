@@ -80,6 +80,30 @@ def _truncate(s: str, n: int = 1200):
     return s if len(s) <= n else s[:n] + "…"
 
 
+# Define sendDirectCallRailApi to send the phone number to another API
+async def sendDirectCallRailApi(phone: str):
+    try:
+        api_url = f"{apiurl}/api/save-callrail-data"  # Endpoint to save call data in Laravel
+        payload = {
+            "phone_number": phone,  # Pass the phone number to Laravel
+        }
+
+        # Send the phone number to the external API (Laravel)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(api_url, json=payload, headers=headers)
+
+            # Check if the request was successful
+            if response.status_code == 200:
+                logger.info(f"Successfully sent phone {phone} to external API.")
+                return response.json()  # Returning the response from the external API
+            else:
+                logger.error(f"Failed to send phone {phone} to external API. Status Code: {response.status_code}")
+                return None
+    except Exception as e:
+        logger.exception(f"Error sending phone {phone} to external API: {e}")
+        return None
+
+# The main background processing function
 async def process_clients_background(client_ids: List[str], session_id: str, user_id: int):
     """Background task to process clients and update progress."""
     active_sessions[session_id] = {
@@ -96,7 +120,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
             resp.raise_for_status()
             call_data = resp.json()
 
-        # 2) Filter by requested client_ids (normalize to str for robust matching)
+        # 2) Filter by requested client_ids
         wanted = {str(cid) for cid in client_ids}
         raw_calls: List[Dict[str, Any]] = call_data.get("data", []) or []
         filtered_calls: List[Dict[str, Any]] = [
@@ -108,7 +132,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
             active_sessions[session_id]["total"] = 0
             return {"status": "success", "processed_phone_numbers": 0}
 
-        # 3) Group calls by phone; pre-check phone existence (for logging only)
+        # 3) Check phone existence and send to another API if not found
         phone_groups: Dict[str, Dict[str, Any]] = {}
 
         async def check_phone_exists(httpc: httpx.AsyncClient, phone: str) -> bool:
@@ -133,10 +157,16 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     continue
 
                 exists = await check_phone_exists(httpc, phone_number)
-                logger.info(
-                    "Phone %s %s in Laravel. Processing anyway.",
-                    phone_number, "exists" if exists else "not found"
-                )
+
+                # Log the result: whether the phone exists or not
+                if exists:
+                    logger.info(f"Phone {phone_number} exists in Laravel, processing further.")
+                else:
+                    logger.info(f"Phone {phone_number} does not exist in Laravel, sending to external API.")
+
+                if not exists:
+                    # Send the phone number to another API if it doesn't exist
+                    await sendDirectCallRailApi(phone_number)
 
                 grp = phone_groups.setdefault(phone_number, {
                     "calls": [],
@@ -209,7 +239,6 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                         "status": cd.get("status"),
                         "is_scored": True,
                         "is_self": False,
-                    
                     })
 
                     processed_count += 1
@@ -326,7 +355,6 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
         active_sessions[session_id]["status"] = "error"
         active_sessions[session_id]["error"] = str(e)
         return {"status": "error", "detail": str(e)}
-
 
 HONORIFICS = {"mr", "mrs", "ms", "miss", "dr", "prof", "sir", "madam"}
 

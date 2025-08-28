@@ -13,7 +13,6 @@ from controller.business_post_image_generate_controller import router as generat
 
 from controller.test_fal_ai import router as test_fal_router
 from controller.post_history_controller import router as post_history_router
-from controller.job_calldata_controller import router as job_calldata_router
 
 app = FastAPI(lifespan=lifespan)
 
@@ -37,7 +36,6 @@ app.include_router(post_history_router, prefix="/api", tags=["post_history"])
 app.include_router(generate_images_for_post_router, prefix="/api")
 # test fal ai
 app.include_router(test_fal_router, prefix="/api", tags=["test"])
-app.include_router(job_calldata_router, prefix="/api", tags=["job_calldata"])
 
 
 

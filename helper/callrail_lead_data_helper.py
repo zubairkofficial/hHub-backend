@@ -5,21 +5,14 @@ from helper.call_processor import CallProcessor
 from helper.database import Database
 import logging
 import re
-import torch
 from dotenv import load_dotenv
 import os
-import whisper
 
-torch.cuda.empty_cache()
-torch.cuda.set_per_process_memory_fraction(0.5)  
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"  
-
+# Initialize logger
 logger = logging.getLogger("cron_job_logger")
-
 load_dotenv()
 
 apiurl = os.getenv("API_URL")
-
 
 headers = {
     "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
@@ -36,9 +29,8 @@ headers = {
 processor = CallProcessor()
 db = Database()
 
-FIXED_ACCOUNT_ID = "562206937" 
+FIXED_ACCOUNT_ID = "562206937"
 
-model = whisper.load_model("tiny", device="cpu")  
 def extract_call_id_from_url(url: str):
     match = re.search(r'/calls/([A-Za-z0-9]+)/', url)
     if match:
@@ -50,19 +42,19 @@ async def process_clients_background(client_ids: List[str], user_id: int):
     try:
         # Fetch transcripts from Laravel API
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(f"{apiurl}/api/transcript", headers=headers)
+            resp = await client.get(f"{apiurl}/api/transcript/{user_id}", headers=headers)
             resp.raise_for_status()
             call_data = resp.json()
 
         # Filter the calls for the specified client_ids
-        wanted = {str(cid) for cid in client_ids}
+        client_ids_set = set(map(str, client_ids))  # Use a set for fast lookup
         raw_calls: List[Dict[str, Any]] = call_data.get("data", []) or []
         filtered_calls: List[Dict[str, Any]] = [
-            c for c in raw_calls if str(c.get("client_id")) in wanted
+            c for c in raw_calls if str(c.get("client_id")) in client_ids_set
         ]
 
         if not filtered_calls:
-            print(f"No calls found for the given client_ids: {client_ids}")
+            logger.info(f"No calls found for the given client_ids: {client_ids}")
             return {"status": "success", "processed_phone_numbers": 0}
 
         phone_groups: Dict[str, Dict[str, Any]] = {}
@@ -70,12 +62,17 @@ async def process_clients_background(client_ids: List[str], user_id: int):
         async def check_phone_exists(httpc: httpx.AsyncClient, phone: str) -> bool:
             try:
                 r = await httpc.get(f"{apiurl}/api/check-phone-number/{phone}")
-                if r.status_code != 200:
-                    return False
+                r.raise_for_status()  # Ensure a 200 status code
                 data = r.json()
                 return bool(data.get("exists"))
+            except httpx.RequestError as e:
+                logger.warning("Request error for phone %s: %s", phone, e)
+                return False
+            except httpx.HTTPStatusError as e:
+                logger.warning("HTTP error for phone %s: %s", phone, e.response.status_code)
+                return False
             except Exception as e:
-                logger.warning("Phone existence check failed for %s: %s", phone, e)
+                logger.warning("General error for phone %s: %s", phone, e)
                 return False
 
         # Process the filtered calls
@@ -83,7 +80,7 @@ async def process_clients_background(client_ids: List[str], user_id: int):
             for call in filtered_calls:
                 phone_number = call.get("phone_number")
                 if not phone_number:
-                    print(f"Skipped call without phone number")
+                    logger.info(f"Skipped call without phone number")
                     continue
 
                 exists = await check_phone_exists(httpc, phone_number)
@@ -104,9 +101,9 @@ async def process_clients_background(client_ids: List[str], user_id: int):
 
         for phone_number, group_data in phone_groups.items():
             try:
-                print(f"Processing phone number: {phone_number}")
+                logger.info(f"Processing phone number: {phone_number}")
 
-                # Transcribe all calls for this phone number
+                # Replace transcription logic with your own implementation (or mock it)
                 transcription_tasks = [
                     transcribe_call(c.get("call_recording"))
                     for c in group_data["calls"]
@@ -116,7 +113,7 @@ async def process_clients_background(client_ids: List[str], user_id: int):
                 valid_transcriptions = [t for t in transcriptions if t]
 
                 if not valid_transcriptions:
-                    print(f"No valid transcriptions for phone number: {phone_number}")
+                    logger.info(f"No valid transcriptions for phone number: {phone_number}")
                     continue
 
                 # Combine all transcriptions
@@ -138,12 +135,12 @@ async def process_clients_background(client_ids: List[str], user_id: int):
                 logger.exception("Error processing phone %s: %s", phone_number, e)
 
         if data_to_send:
-            print(f"Sending processed data to Laravel")
-            # Send to Laravel here (simplified)
+            logger.info(f"Sending processed data for {processed_count} phone numbers to Laravel")
+            # Simulate sending to Laravel
             # result = await send_data_to_laravel(data_to_send, user_id)
-            print(f"Processed {processed_count} phone numbers.")
+            logger.info(f"Successfully sent {processed_count} phone numbers.")
         else:
-            print("No valid data to send to Laravel.")
+            logger.info("No valid data to send to Laravel.")
 
         return {"status": "success", "processed_phone_numbers": processed_count}
 
@@ -151,14 +148,16 @@ async def process_clients_background(client_ids: List[str], user_id: int):
         logger.exception("Error processing clients: %s", e)
         return {"status": "error", "detail": str(e)}
 
-# Simplified transcribe call
+# Placeholder transcription function (you can implement it accordingly)
 async def transcribe_call(recording_url):
+    # Mocked transcription process since we no longer use whisper or torch
     if not recording_url:
         return None
     call_id = extract_call_id_from_url(recording_url)
     if not call_id:
         return None
     try:
+        # Assuming you will process calls here with CallProcessor or another method
         result = await processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
         return result.get("transcription") if isinstance(result, dict) else None
     except Exception as e:
