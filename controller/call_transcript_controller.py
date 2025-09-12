@@ -860,12 +860,22 @@ class SystemPrompt(BaseModel):
      analytics_prompt:str
      summery_score:str
      hour:str
+     client_id: Optional[int] = None  # Allow null client_id
+     role_name: Optional[str] = None  # Allow null role_name
     
-    
+
+
 @router.post("/prompt")
 async def system_prompt(prompt: SystemPrompt):
     try:
-        obj = await SystemPrompts.filter().first()
+        valid_roles = {"Super Admin", "Employee", "Project Manager", "Client"}
+        if prompt.role_name and prompt.role_name not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role_name. Must be one of {valid_roles}")
+
+        obj = await SystemPrompts.filter(
+            client_id=prompt.client_id,
+            role_name=prompt.role_name
+        ).first()
 
         if obj:
             await obj.update_from_dict(prompt.dict(exclude_unset=True))
@@ -878,19 +888,106 @@ async def system_prompt(prompt: SystemPrompt):
     except Exception as e:
         print(f"Error while saving prompts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error while saving {str(e)}")
-    
-    
+
 @router.get("/prompt")
-async def system_prompt():
+async def system_prompt(
+    client_id: Optional[int] = Query(None, description="Client ID"),
+    role_name: Optional[str] = Query(None, description="Role name")
+):
     try:
-        system_prompt = await SystemPrompts.all().first()
-        
-        if system_prompt:
-            return {"success": True, "message": "Prompt fetched successfully", "prompt": system_prompt}
+        valid_roles = {"Super Admin", "Employee", "Project Manager", "Client"}
+        if role_name and role_name not in valid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid role_name. Must be one of {valid_roles}")
+
+        # Fetch logic based on role_name and client_id
+        if role_name == "Super Admin" or client_id is None or role_name in ["Employee", "Project Manager"]:
+            # Try to fetch Super Admin prompt
+            system_prompt = await SystemPrompts.filter(role_name="Super Admin", client_id=None).first()
+            if not system_prompt:
+                # Create default Super Admin prompt if none exists
+                system_prompt = await SystemPrompts.create(
+                    system_prompt="Default Super Admin system prompt",
+                    analytics_prompt="Default Super Admin analytics prompt",
+                    summery_score="Default score",
+                    hour="1",
+                    client_id=None,
+                    role_name="Super Admin"
+                )
+        elif role_name == "Client" and client_id is not None:
+            # Try to fetch client-specific prompt
+            system_prompt = await SystemPrompts.filter(role_name="Client", client_id=client_id).first()
+            if not system_prompt:
+                # Fallback to Super Admin prompt
+                system_prompt = await SystemPrompts.filter(role_name="Super Admin", client_id=None).first()
+                if not system_prompt:
+                    # Create default Super Admin prompt as final fallback
+                    system_prompt = await SystemPrompts.create(
+                        system_prompt="Default Super Admin system prompt",
+                        analytics_prompt="Default Super Admin analytics prompt",
+                        summery_score="Default score",
+                        hour="1",
+                        client_id=None,
+                        role_name="Super Admin"
+                    )
         else:
-            raise HTTPException(status_code=404, detail="Prompt not found")
+            # Default to Super Admin prompt
+            system_prompt = await SystemPrompts.filter(role_name="Super Admin", client_id=None).first()
+            if not system_prompt:
+                system_prompt = await SystemPrompts.create(
+                    system_prompt="Default Super Admin system prompt",
+                    analytics_prompt="Default Super Admin analytics prompt",
+                    summery_score="Default score",
+                    hour="1",
+                    client_id=None,
+                    role_name="Super Admin"
+                )
+
+        # Serialize the prompt to a dictionary
+        prompt_response = {
+            "id": system_prompt.id,
+            "system_prompt": system_prompt.system_prompt,
+            "analytics_prompt": system_prompt.analytics_prompt,
+            "summery_score": system_prompt.summery_score,
+            "hour": system_prompt.hour,
+            "client_id": system_prompt.client_id,
+            "role_name": system_prompt.role_name,
+            "created_at": system_prompt.created_at.isoformat(),
+            "updated_at": system_prompt.updated_at.isoformat()
+        }
+        return {"success": True, "message": "Prompt fetched successfully", "prompt": prompt_response}
 
     except Exception as e:
         print(f"Error while fetching prompt: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error while fetching prompt")
+        raise HTTPException(status_code=500, detail=f"Internal server error while fetching prompt: {str(e)}")
+# @router.post("/prompt")
+# async def system_prompt(prompt: SystemPrompt):
+#     try:
+#         obj = await SystemPrompts.filter().first()
+
+#         if obj:
+#             await obj.update_from_dict(prompt.dict(exclude_unset=True))
+#             await obj.save()
+#             return {"message": "Prompt updated successfully", "id": obj.id}
+#         else:
+#             obj = await SystemPrompts.create(**prompt.dict())
+#             return {"message": "Prompt created successfully", "id": obj.id}
+
+#     except Exception as e:
+#         print(f"Error while saving prompts: {str(e)}")
+#         raise HTTPException(status_code=500, detail=f"Error while saving {str(e)}")
+    
+    
+# @router.get("/prompt")
+# async def system_prompt():
+#     try:
+#         system_prompt = await SystemPrompts.all().first()
+        
+#         if system_prompt:
+#             return {"success": True, "message": "Prompt fetched successfully", "prompt": system_prompt}
+#         else:
+#             raise HTTPException(status_code=404, detail="Prompt not found")
+
+#     except Exception as e:
+#         print(f"Error while fetching prompt: {str(e)}")
+#         raise HTTPException(status_code=500, detail="Internal server error while fetching prompt")
     
