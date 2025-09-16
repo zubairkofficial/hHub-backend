@@ -1,11 +1,13 @@
 import os
+import logging
 import httpx
+import json
 from datetime import datetime, timedelta
 from tortoise import Tortoise
 from helper.tortoise_config import TORTOISE_CONFIG
 from dotenv import load_dotenv
 import asyncio
-from helper.callrail_lead_data_helper import process_clients_background  # Import the helper function for processing
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,48 +33,78 @@ headers = {
 }
 
 async def get_users_by_client():
-    await Tortoise.init(config=TORTOISE_CONFIG)
-    await Tortoise.generate_schemas()
-    
+    """
+    Fetch all users with their associated client data from the Laravel API.
+    """
+    logger = logging.getLogger("cron_job")
+    logger.setLevel(logging.DEBUG)
+
     try:
-        # Make the GET request to the Laravel API
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{apiurl}/api/get-users-by-client", headers=headers)
+        async with httpx.AsyncClient(timeout=30.0) as client_http:
+            logger.info("Fetching users with client relationships...")
+            resp = await client_http.get(f"{apiurl}/api/get-users-by-client", headers=headers)
+            resp.raise_for_status()
+            users_data = resp.json()
+            print(f"data comes {users_data}")
 
-        # If the response from Laravel API is successful
-        if response.status_code == 200:
-            data = response.json()  # Get the JSON data from the response
-            
-            # Loop through the data['data'] and check if the 'client' array is not null or empty
-            for user in data['data']:
-                if user.get('client'):  # Check if 'client' array is not empty
-                    client_ids = [str(client['client_id']) for client in user['client']]  # Extract client ids
-                    
-                    user_id = user['id']  # Example user_id, replace it with the actual user id from your logic
-                    
-                    # Call the process_clients_background function for each valid user
-                    print(f"Processing clients for user {user['name']} with client ids {client_ids}")
-                    await process_clients_background(client_ids, user_id)
-                else:
-                    print(f"No valid client data for user {user['name']}")
+            # ✅ Fix 1: check the right key/shape
+            status = (users_data.get("status") or "").lower()
+            if status != "success":
+                logger.error(f"Failed to fetch users: {users_data.get('message', 'Unknown error')}")
+                return {"status": "error", "message": users_data.get("message", "Failed to fetch users")}
 
-        # If Laravel API returned a non-200 status code, print the error
-        else:
-            print(f"Failed to fetch data from Laravel. Status Code: {response.status_code}")
-            print(f"Response: {response.text}")
+            # ✅ Fix 2: robustly read list of users
+            raw_users = users_data.get("data") or []
+            if not isinstance(raw_users, list):
+                logger.error("Payload 'data' is not a list.")
+                return {"status": "error", "message": "Malformed response: data is not a list"}
 
-    except httpx.RequestError as e:
-        # If there’s a request error (e.g. network issue, invalid URL)
-        print(f"Request failed: {e}")
+            formatted = {"status": "success", "data": []}
 
+            for u in raw_users:
+                # Minimal safe fields
+                user_entry = {
+                    "id": u.get("id"),
+                    "name": u.get("name") or "",
+                    "last_name": u.get("last_name") or "",
+                    "email": u.get("email") or "",
+                    'client_id':u.get("client_id"),
+                    "status": u.get("status"),
+                    "client": [],
+                }
+
+                # ✅ Fix 3: API returns 'client' (singular), not 'clients'
+                client_list = u.get("client") or []
+                if isinstance(client_list, list):
+                    for c in client_list:
+                        # source shows: {'id', 'user_id', 'client_id', ...}
+                        client_rail_id = c.get('client') or {}
+
+                        user_entry["client"].append({
+                            "id": c.get("id"),
+                            "user_id": c.get("user_id"),
+                            # use the actual client_id from the relation row
+                            "client_id": c.get("client_id"),
+                            # keep placeholders for optional fields if your downstream expects them
+                            "name": c.get("name") or "Unnamed Client",
+                            "callrail_id": client_rail_id['callrail_id'] if client_rail_id else '',
+                            "created_at": c.get("created_at"),
+                            "updated_at": c.get("updated_at"),
+                            "deleted_at": c.get("deleted_at"),
+                        })
+
+                formatted["data"].append(user_entry)
+
+            # logger.info(f"Fetched {len(formatted['data'])} users with client data")
+            # logger.debug(f"Users data (normalized): {json.dumps(formatted, indent=2)}")
+            return formatted
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error fetching users: {e.response.status_code} - {e.response.text}")
+        return {"status": "error", "message": f"HTTP error: {e.response.status_code}"}
     except Exception as e:
-        # Catch any other errors
-        print(f"Internal server error: {e}")
-    
-    finally:
-        # Ensure that the database connection is closed properly
-        await Tortoise.close_connections()
-        print("Tortoise connections closed.")
+        logger.error(f"Error in get_users_by_client: {str(e)}", exc_info=True)
+        return {"status": "error", "message": str(e)}
 
 # Main execution logic (to run the job)
 if __name__ == "__main__":

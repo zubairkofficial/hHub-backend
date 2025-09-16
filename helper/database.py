@@ -1,6 +1,5 @@
 import aiomysql
 from typing import List, Dict, Tuple, Any
-from helper.call_processor import CallProcessor
 from helper.lead_scoring import LeadScoringService
 from models.lead_score import LeadScore
 from urllib.parse import urlparse, parse_qs
@@ -20,7 +19,6 @@ class Database:
         self.user = os.getenv('DB_USER')
         self.password = os.getenv('DB_PASSWORD')
         self.db = os.getenv('DB_NAME')
-        self.processor = CallProcessor()
         self.scoring_service = LeadScoringService()
         self.re_scoring_service = LeadScoringService()
 

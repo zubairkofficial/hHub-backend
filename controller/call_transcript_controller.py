@@ -103,6 +103,8 @@ async def sendDirectCallRailApi(phone: str):
         logger.exception(f"Error sending phone {phone} to external API: {e}")
         return None
 
+
+HONORIFICS = {"mr", "mrs", "ms", "miss", "dr", "prof", "sir", "madam"}
 # The main background processing function
 async def process_clients_background(client_ids: List[str], session_id: str, user_id: int):
     """Background task to process clients and update progress."""
@@ -114,26 +116,34 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
     }
 
     try:
-        # 1) Fetch transcripts from Laravel
+        # 1) Fetch processed call records from Laravel (Laravel decides filtering)
         async with httpx.AsyncClient(timeout=30.0) as http:
-            resp = await http.get(f"{apiurl}/api/transcript", headers=headers)
+            url = f"{apiurl}/api/transcript/{user_id}"
+            logger.info(f"Fetching processed call records from {url}")
+            resp = await http.get(url, headers=headers)
             resp.raise_for_status()
             call_data = resp.json()
 
-        # 2) Filter by requested client_ids
-        wanted = {str(cid) for cid in client_ids}
         raw_calls: List[Dict[str, Any]] = call_data.get("data", []) or []
-        filtered_calls: List[Dict[str, Any]] = [
-            c for c in raw_calls if str(c.get("client_id")) in wanted
-        ]
-
-        if not filtered_calls:
+        if not raw_calls:
+            logger.info("No processed call records found")
             active_sessions[session_id]["status"] = "completed"
             active_sessions[session_id]["total"] = 0
             return {"status": "success", "processed_phone_numbers": 0}
 
-        # 3) Check phone existence and send to another API if not found
+        logger.info(f"Found {len(raw_calls)} processed call records")
+
+        # 2) Group calls by phone (robust phone extraction)
         phone_groups: Dict[str, Dict[str, Any]] = {}
+
+        def _pick_phone(call: Dict[str, Any]) -> Optional[str]:
+            v = (
+                call.get("phone_number")
+                or call.get("caller_phone_number")
+                or call.get("contact_number")
+                or call.get("phone")
+            )
+            return v.strip() if isinstance(v, str) else None
 
         async def check_phone_exists(httpc: httpx.AsyncClient, phone: str) -> bool:
             try:
@@ -147,9 +157,15 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                 return False
 
         async with httpx.AsyncClient(timeout=15.0) as httpc:
-            for call in filtered_calls:
-                phone_number = call.get("phone_number")
+            missing_phone_count = 0
+            for call in raw_calls:
+                phone_number = _pick_phone(call)
                 if not phone_number:
+                    missing_phone_count += 1
+                    # Keep a breadcrumb in details; also log once per ~10 misses to avoid spam
+                    if missing_phone_count <= 5:
+                        logger.warning("Skipped call without phone_number; keys=%s",
+                                       list(call.keys())[:15])
                     active_sessions[session_id]["details"].append({
                         "message": "Skipped call without phone_number",
                         "status": "skipped",
@@ -157,16 +173,15 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     continue
 
                 exists = await check_phone_exists(httpc, phone_number)
-
-                # Log the result: whether the phone exists or not
                 if exists:
-                    logger.info(f"Phone {phone_number} exists in Laravel, processing further.")
+                    logger.info("Phone %s exists in Laravel, processing further.", phone_number)
                 else:
-                    logger.info(f"Phone {phone_number} does not exist in Laravel, sending to external API.")
-
-                if not exists:
-                    # Send the phone number to another API if it doesn't exist
-                    await sendDirectCallRailApi(phone_number)
+                    logger.info("Phone %s does not exist in Laravel, sending to external API.", phone_number)
+                    try:
+                        # optional hook you already had
+                        await sendDirectCallRailApi(phone_number)
+                    except Exception as e:
+                        logger.warning("sendDirectCallRailApi failed for %s: %s", phone_number, e)
 
                 grp = phone_groups.setdefault(phone_number, {
                     "calls": [],
@@ -176,19 +191,25 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
 
         # Progress target: total = distinct phones we’ll process
         active_sessions[session_id]["total"] = len(phone_groups)
+        logger.info("Built %d phone group(s)", len(phone_groups))
 
         if not phone_groups:
             active_sessions[session_id]["status"] = "completed"
             return {"status": "success", "processed_phone_numbers": 0}
 
-        # 4) Helper: transcribe one call
-        async def transcribe_call(recording_url: str) -> Optional[str]:
+        # 3) Helper: transcribe one call (robust recording URL extraction)
+        async def transcribe_call(recording_url: Optional[str]) -> Optional[str]:
             if not recording_url:
                 return None
-            call_id = extract_call_id_from_url(recording_url)
-            if not call_id:
-                return None
             try:
+                # Your original logic expects a CallRail call_id. Keep it but be defensive.
+                try:
+                    call_id = extract_call_id_from_url(recording_url)
+                except NameError:
+                    call_id = None
+                if not call_id:
+                    # If you don't need a call_id, you can return None and let "miss" path handle it.
+                    return None
                 result = await processor.process_call(account_id=FIXED_ACCOUNT_ID, call_id=call_id)
                 tx = result.get("transcription") if isinstance(result, dict) else None
                 return tx.strip() if isinstance(tx, str) and tx.strip() else None
@@ -199,7 +220,7 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
         processed_count = 0
         data_to_send: List[Dict[str, Any]] = []
 
-        # 5) Process each phone group
+        # 4) Process each phone group
         for phone_number, group_data in phone_groups.items():
             try:
                 active_sessions[session_id]["details"].append({
@@ -207,11 +228,11 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     "status": "processing",
                 })
 
-                # Transcribe all calls for this phone
+                # Transcribe all calls for this phone — look for 'call_recording' OR 'recording_url'
                 transcription_tasks = [
-                    transcribe_call(c.get("call_recording"))
+                    transcribe_call(c.get("call_recording") or c.get("recording_url"))
                     for c in group_data["calls"]
-                    if c.get("call_recording")
+                    if (c.get("call_recording") or c.get("recording_url"))
                 ]
                 transcriptions = await asyncio.gather(*transcription_tasks, return_exceptions=False)
                 valid_transcriptions = [t for t in transcriptions if t]
@@ -219,6 +240,16 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                 cd = group_data.get("call_data") or {}
                 client_id_int = _int_or_none(cd.get("client_id"))
                 recent_call = group_data["calls"][-1]
+
+                if not valid_transcriptions:
+                    # If the call row itself already carries a transcript, fall back to that:
+                    fallback_tx = None
+                    for c in reversed(group_data["calls"]):
+                        if isinstance(c.get("transcription"), str) and c["transcription"].strip():
+                            fallback_tx = c["transcription"].strip()
+                            break
+                    if fallback_tx:
+                        valid_transcriptions = [fallback_tx]
 
                 if not valid_transcriptions:
                     # No transcript → mark as miss
@@ -324,15 +355,26 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     "status": "error",
                 })
 
-        # 6) Send all queued leads to Laravel in one batch
+        # 5) Send all queued leads to Laravel in one batch
         if data_to_send:
             try:
-                result = await send_data_to_laravel(data_to_send, user_id=user_id) 
+                # Show one example payload for sanity
+                sample = {k: data_to_send[0].get(k) for k in ("contact_number", "type", "client_id", "callrail_id")}
+                logger.info("Queuing %d lead(s) to Laravel; sample=%s", len(data_to_send), sample)
 
-                ok = (result or {}).get("status") == "success"
+                result = await send_data_to_laravel(data_to_send, user_id=user_id)
+
+                status = (result or {}).get("status")
+                created = len((result or {}).get("created") or [])
+                updated = len((result or {}).get("updated") or [])
+                errors  = (result or {}).get("errors") or {}
+
+                logger.info("Laravel /save-client-lead → status=%s created=%d updated=%d errors=%d",
+                            status, created, updated, len(errors))
+
                 active_sessions[session_id]["details"].append({
-                    "message": "Sent batch to Laravel" if ok else f"Laravel error: {(result or {}).get('body')}",
-                    "status": "completed" if ok else "error",
+                    "message": f"Sent batch to Laravel (status={status}, created={created}, updated={updated})",
+                    "status": "completed" if status in ("success", "partial") else "error",
                 })
             except Exception as e:
                 logger.exception("Failed sending data to Laravel: %s", e)
@@ -340,8 +382,10 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
                     "message": f"Failed sending to Laravel: {str(e)}",
                     "status": "error",
                 })
+        else:
+            logger.info("No leads to send to Laravel (data_to_send empty)")
 
-        # 7) Finalize progress
+        # 6) Finalize progress
         active_sessions[session_id]["status"] = "completed"
         active_sessions[session_id]["processed"] = processed_count
 
@@ -355,8 +399,6 @@ async def process_clients_background(client_ids: List[str], session_id: str, use
         active_sessions[session_id]["status"] = "error"
         active_sessions[session_id]["error"] = str(e)
         return {"status": "error", "detail": str(e)}
-
-HONORIFICS = {"mr", "mrs", "ms", "miss", "dr", "prof", "sir", "madam"}
 
 def _clean_token(tok: str) -> str:
     return re.sub(r"[^\w'-]", "", tok).strip()

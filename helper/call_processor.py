@@ -9,6 +9,8 @@ import asyncio
 from datetime import datetime
 import traceback
 from dotenv import load_dotenv
+import subprocess
+import shutil
 
 load_dotenv()
 
@@ -22,6 +24,41 @@ class CallProcessor:
         self.bearer_token = CALLRAIL_BEARER_TOKEN
         # Initialize Whisper model
         self.model = whisper.load_model("base")
+        # Check if FFmpeg is available
+        self.ffmpeg_available = self._check_ffmpeg()
+    
+    def _check_ffmpeg(self) -> bool:
+        """Check if FFmpeg is available in the system"""
+        # First try the standard PATH
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=5)
+            if result.returncode == 0:
+                return True
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            pass
+        
+        # Check common Windows installation paths
+        common_paths = [
+            r"C:\ffmpeg\bin\ffmpeg.exe",
+            r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+            r"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+            os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-*\bin\ffmpeg.exe")
+        ]
+        
+        for path in common_paths:
+            if "*" in path:
+                # Handle wildcard paths for winget installations
+                import glob
+                matches = glob.glob(path)
+                if matches and os.path.exists(matches[0]):
+                    return True
+            elif os.path.exists(path):
+                return True
+        
+        return False
         
     async def get_recording_url(self, account_id: str, call_id: str) -> Optional[str]:
         url = f"{CALLRAIL_API_BASE}/a/{account_id}/calls/{call_id}.json"
@@ -86,6 +123,18 @@ class CallProcessor:
             if not os.path.exists(audio_path):
                 print(f"File not found for transcription: {audio_path}")
                 return None
+            
+            if not self.ffmpeg_available:
+                print("FFmpeg not available. Please install FFmpeg to enable audio transcription.")
+                print("Install options:")
+                print("1. winget install 'FFmpeg (Essentials Build)'")
+                print("2. choco install ffmpeg")
+                print("3. Download from https://ffmpeg.org/download.html")
+                return {
+                    'transcription': '[Audio transcription unavailable - FFmpeg not installed]',
+                    'language': 'unknown'
+                }
+            
             print(f"File ready for transcription: {audio_path}")
             result = self.model.transcribe(audio_path)
             return {
