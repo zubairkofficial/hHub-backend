@@ -41,38 +41,47 @@ class LeadScoringService:
 
         self.default_score_prompt = """You are an expert lead scoring analyst. Given the following analysis summary, provide scores for the following aspects (0-100):\n1. Customer Intent\n2. Urgency\n3. Overall\nAlso, briefly justify each score.\n\n{format_instructions}"""
 
-    async def get_prompts(self):
+    async def get_prompts(self, client_id: Optional[int] = None):
         try:
-            prompts = await SystemPrompts.filter().first()
-            
+            prompts = None
+
+            # Step 1: If client_id is provided, try fetching client-specific prompts
+            if client_id:
+                prompts = await SystemPrompts.filter(client_id=client_id).first()
+
+            # Step 2: If no client-specific prompt found, fall back to the first available global prompt
+            if not prompts:
+                prompts = await SystemPrompts.filter().first()
+            analytic_prompts = await SystemPrompts.filter().first()
+
+            # Step 3: Use defaults if still nothing found
             if prompts:
-                analytics_prompt = prompts.analytics_prompt if prompts.analytics_prompt else self.default_analytics_prompt
-                score_prompt = prompts.summery_score if prompts.summery_score else self.default_score_prompt
-                
-                return {
-                    'analytics_prompt': analytics_prompt,
-                    'score_prompt': score_prompt
-                }
+                analytics_prompt = getattr(analytic_prompts, "analytics_prompt", None) or self.default_analytics_prompt
+                score_prompt = getattr(prompts, "summery_score", None) or self.default_score_prompt
             else:
-                return {
-                    'analytics_prompt': self.default_analytics_prompt,
-                    'score_prompt': self.default_score_prompt
-                }
-                
+                analytics_prompt = self.default_analytics_prompt
+                score_prompt = self.default_score_prompt
+
+            return {
+                "analytics_prompt": analytics_prompt,
+                "score_prompt": score_prompt
+            }
+
         except Exception as e:
             print(f"Error fetching prompts from database: {e}")
             return {
-                'analytics_prompt': self.default_analytics_prompt,
-                'score_prompt': self.default_score_prompt
+                "analytics_prompt": self.default_analytics_prompt,
+                "score_prompt": self.default_score_prompt
             }
+
 
     async def generate_summary(self, transcription: str, client_type: Optional[str] = None, 
                              service: Optional[str] = None, state: Optional[str] = None, 
                              city: Optional[str] = None, first_call: Optional[bool] = None, 
-                             rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None) -> dict:
+                             rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None, client_id: Optional[int] = None) -> dict:
   
         await self._init_llm()
-        prompts = await self.get_prompts()
+        prompts = await self.get_prompts(client_id=client_id)
         print(prompts['analytics_prompt'])
         summary_prompt = ChatPromptTemplate.from_messages([ 
             ("system", prompts['analytics_prompt']),
@@ -90,11 +99,12 @@ class LeadScoringService:
         )
         
         response = await self.llm.ainvoke(formatted_prompt)
-        return {"summary": response.content.strip()}
+        return {"summary": response.content.strip(),'client_id':client_id}
 
-    async def score_summary(self, analysis_summary: str) -> LeadAnalysis:
+    async def score_summary(self, analysis_summary: str,client_id: Optional[int] = None) -> LeadAnalysis:
         await self._init_llm()
-        prompts = await self.get_prompts()
+        prompts = await self.get_prompts(client_id=client_id)
+        print(f"bhai client_id = {client_id}")
         print(prompts['score_prompt'])
       
         score_prompt = ChatPromptTemplate.from_messages([ 
@@ -114,7 +124,7 @@ class LeadScoringService:
     async def analyze_lead(self, transcription: str, client_type: Optional[str] = None, 
                           service: Optional[str] = None, state: Optional[str] = None, 
                           city: Optional[str] = None, first_call: Optional[bool] = None, 
-                          rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None) -> dict:
+                          rota_plan: Optional[str] = None, previous_analysis: Optional[str] = None,client_id: Optional[int] = None) -> dict:
        
         try:
             # Generate the analysis summary first
@@ -126,11 +136,12 @@ class LeadScoringService:
                 city=city,
                 first_call=first_call,
                 rota_plan=rota_plan,
-                previous_analysis=previous_analysis
+                previous_analysis=previous_analysis,
+                client_id=client_id
             )
             
             # Score the generated analysis summary
-            scoring_result = await self.score_summary(summary_result["summary"])
+            scoring_result = await self.score_summary(summary_result["summary"],client_id=client_id)
 
             # Correctly accessing the attributes of the LeadAnalysis object
             return {
@@ -138,7 +149,8 @@ class LeadScoringService:
                 "intent_score": scoring_result.intent_score,  # Correct attribute access
                 "urgency_score": scoring_result.urgency_score,  # Correct attribute access
                 "overall_score": scoring_result.overall_score,  # Correct attribute access
-                "analysis_summary": scoring_result.analysis_summary  # Correct attribute access
+                "analysis_summary": scoring_result.analysis_summary,  # Correct attribute access,
+                "client_id":client_id
             }
             
         except Exception as e:

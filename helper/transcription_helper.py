@@ -91,7 +91,8 @@ async def process_unprocessed_callrails():
                 city=recent_call.get("city"),
                 first_call=recent_call.get("first_call"),
                 rota_plan=recent_call.get("rota_plan"),
-                previous_analysis=None
+                previous_analysis=None,
+                
             )
             analysis_summary = summary_response["summary"]
             scores = await scoring_service.score_summary(analysis_summary)
