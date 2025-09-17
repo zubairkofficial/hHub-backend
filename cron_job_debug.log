@@ -1,35 +1,11 @@
-2025-09-17 12:37:29,143 - cron_job - INFO - === Starting cron job ===
-2025-09-17 12:37:29,203 - cron_job - INFO - Fetching users and client data...
-2025-09-17 12:37:29,634 - cron_job - INFO - Fetching users with client relationships...
-2025-09-17 12:37:29,753 - cron_job - INFO - Successfully received data for 9 users
-2025-09-17 12:37:29,753 - cron_job - INFO - 
-=== Processing user ID: 16 === {'id': 16, 'name': 'Jenny', 'last_name': 'K', 'email': 'jenny.kennie@gmail.com', 'client_id': 6, 'status': 'active', 'client': [{'id': 5, 'user_id': 16, 'client_id': 2, 'name': 'Unnamed Client', 'callrail_id': 'COM67606b276e9145ca874ffb3272b4ad4e', 'created_at': None, 'updated_at': None, 'deleted_at': None}, {'id': 6, 'user_id': 16, 'client_id': 3, 'name': 'Unnamed Client', 'callrail_id': 'COM9e4178fac5644448828d6c8715b5f19d', 'created_at': None, 'updated_at': None, 'deleted_at': None}]}
-2025-09-17 12:37:29,754 - cron_job - INFO - Processing client 6 (user 16) session=8df526c2-7648-4a11-b4d0-825cc73f6831
-2025-09-17 12:37:30,209 - cron_job - INFO - 
-=== Processing user ID: 27 === {'id': 27, 'name': 'Ronny S.', 'last_name': '', 'email': 'ronak@invertux.com', 'client_id': 5, 'status': 'pending', 'client': []}
-2025-09-17 12:37:30,210 - cron_job - INFO - Processing client 5 (user 27) session=1801c64f-a00f-40a4-83fc-2d92e87ced2e
-2025-09-17 12:37:30,658 - cron_job - INFO - 
-=== Processing user ID: 28 === {'id': 28, 'name': 'Robert', 'last_name': 'Martin', 'email': 'robert.martin@detall.com', 'client_id': 2, 'status': 'active', 'client': []}
-2025-09-17 12:37:30,658 - cron_job - INFO - Processing client 2 (user 28) session=e7b7cce3-eca5-4383-adb5-be2cc4202950
-2025-09-17 12:38:34,751 - cron_job - INFO - 
-=== Processing user ID: 29 === {'id': 29, 'name': 'Noah James', 'last_name': '', 'email': 'Noah.james@apexdental.com', 'client_id': 6, 'status': 'pending', 'client': []}
-2025-09-17 12:38:34,752 - cron_job - INFO - Processing client 6 (user 29) session=c68e510e-3544-483c-bdd0-d701c2c32028
-2025-09-17 12:38:35,206 - cron_job - INFO - 
-=== Processing user ID: 35 === {'id': 35, 'name': 'Jerry', 'last_name': '', 'email': 'jerry@trimatra.com', 'client_id': 7, 'status': 'pending', 'client': []}
-2025-09-17 12:38:35,206 - cron_job - INFO - Processing client 7 (user 35) session=7a295bf9-9c78-4a38-b805-464b14558192
-2025-09-17 12:38:36,098 - cron_job - INFO - 
-=== Processing user ID: 36 === {'id': 36, 'name': 'Lanet', 'last_name': '', 'email': 'lanet@gmaill.com', 'client_id': 8, 'status': 'pending', 'client': []}
-2025-09-17 12:38:36,098 - cron_job - INFO - Processing client 8 (user 36) session=d4fdccc9-ae89-438b-a965-d17552608ecd
-2025-09-17 12:38:36,554 - cron_job - INFO - 
-=== Processing user ID: 38 === {'id': 38, 'name': 'Philippa Adkinss', 'last_name': '', 'email': 'philippa.adkinss@balasmiles.com', 'client_id': 3, 'status': 'pending', 'client': []}
-2025-09-17 12:38:36,555 - cron_job - INFO - Processing client 3 (user 38) session=403b0780-71a3-4a5f-9839-323c2f4241c3
-2025-09-17 12:38:37,486 - cron_job - INFO - 
-=== Processing user ID: 39 === {'id': 39, 'name': 'Wagner G.', 'last_name': '', 'email': 'wagner.g32@balhofforthodontics.com', 'client_id': 4, 'status': 'active', 'client': []}
-2025-09-17 12:38:37,487 - cron_job - INFO - Processing client 4 (user 39) session=4a2258fd-2199-421d-86de-82ba5d7afb7f
-2025-09-17 12:38:37,947 - cron_job - INFO - 
-=== Processing user ID: 40 === {'id': 40, 'name': 'Abenoja&Warrior Orthodontics', 'last_name': '', 'email': 'abenoja123@gmaill.com', 'client_id': 9, 'status': 'active', 'client': []}
-2025-09-17 12:38:37,948 - cron_job - INFO - Processing client 9 (user 40) session=9c234c73-1776-4b43-afd1-b3c15d5d3019
-2025-09-17 12:38:40,125 - cron_job - INFO - 
+2025-09-17 17:35:11,661 - cron_job - INFO - === Starting cron job ===
+2025-09-17 17:35:11,662 - cron_job - INFO - Fetching users and client data...
+2025-09-17 17:35:12,084 - cron_job - INFO - Fetching users with client relationships...
+2025-09-17 17:35:12,146 - cron_job - INFO - Successfully received data for 1 users
+2025-09-17 17:35:12,146 - cron_job - INFO - 
+=== Processing user ID: 16 === {'id': 16, 'name': 'Jenny', 'last_name': 'K', 'email': 'jenny.kennie@gmail.com', 'client_id': 6, 'status': 'active', 'client': [{'id': 5, 'user_id': 16, 'client_id': 2, 'name': 'Unnamed Client', 'callrail_id': '', 'created_at': None, 'updated_at': None, 'deleted_at': None}, {'id': 6, 'user_id': 16, 'client_id': 3, 'name': 'Unnamed Client', 'callrail_id': '', 'created_at': None, 'updated_at': None, 'deleted_at': None}]}
+2025-09-17 17:35:12,147 - cron_job - INFO - Processing client 6 (user 16) session=053d9a49-ec21-496f-b3e7-1a687eacbcc5
+2025-09-17 17:35:12,733 - cron_job - INFO - 
 === Cron job completed ===
-2025-09-17 12:38:40,125 - cron_job - INFO - Processed 9 users (9 successfully)
-2025-09-17 12:38:40,126 - cron_job - INFO - Total records processed: 3
+2025-09-17 17:35:12,733 - cron_job - INFO - Processed 1 users (1 successfully)
+2025-09-17 17:35:12,734 - cron_job - INFO - Total records processed: 0

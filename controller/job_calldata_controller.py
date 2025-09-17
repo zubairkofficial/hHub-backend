@@ -4,6 +4,7 @@ import httpx
 import json
 from datetime import datetime, timedelta
 from tortoise import Tortoise
+from typing import Optional
 from helper.tortoise_config import TORTOISE_CONFIG
 from dotenv import load_dotenv
 import asyncio
@@ -12,7 +13,7 @@ import asyncio
 # Load environment variables from .env file
 load_dotenv()
 
-# API URL for the Laravel backend (replace with actual URL)
+# API URL for the Laravel backend (replace with actual URL) 
 apiurl = os.getenv("API_URL")
 
 # Ensure the API URL contains a valid protocol
@@ -29,20 +30,24 @@ headers = {
     "sec-fetch-site": "none",
     "sec-fetch-user": "?1",
     "upgrade-insecure-requests": "1",
+    "Accept": "application/json",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 }
 
-async def get_users_by_client():
+async def get_users_by_client(user_id: Optional[int] = None):
     """
     Fetch all users with their associated client data from the Laravel API.
     """
     logger = logging.getLogger("cron_job")
     logger.setLevel(logging.DEBUG)
+    url = f"{apiurl}/api/get-users-by-client{f'?user_id={user_id}' if user_id else ''}"
+    print(f"new url we have {url}")
+    
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client_http:
             logger.info("Fetching users with client relationships...")
-            resp = await client_http.get(f"{apiurl}/api/get-users-by-client", headers=headers)
+            resp = await client_http.get(url, headers=headers)
             resp.raise_for_status()
             users_data = resp.json()
             print(f"data comes {users_data}")
