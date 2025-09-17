@@ -45,7 +45,7 @@ async def get_users_by_client(user_id: Optional[int] = None):
     
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client_http:
+        async with httpx.AsyncClient(timeout=60.0) as client_http:
             logger.info("Fetching users with client relationships...")
             resp = await client_http.get(url, headers=headers)
             resp.raise_for_status()
