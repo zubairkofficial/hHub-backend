@@ -148,3 +148,116 @@ async def mark_call_as_processed(update_url):
             print(f"Failed to mark call: {update_url}, error: {e}")
         except Exception as e:
             print(f"Error in marking call: {update_url}, error: {e}")
+
+
+# shoaib code start# 
+# 🚫 New function – does NOT save into LeadScore
+async def process_unprocessed_callrails_no_store(call_data: list):
+    await Tortoise.init(config=TORTOISE_CONFIG)
+    await Tortoise.generate_schemas()
+    try:
+        # ✅ Use data from Laravel, skip transcript API call
+        rows = [row for row in call_data if not row.get("is_processed")]
+
+        if not rows:
+            print(f"[{datetime.now()}] No unprocessed callrails found.")
+            return {"data": []}
+
+        # 🔹 Group calls by phone_number
+        phone_groups = {}
+        for row in rows:
+            phone_number = row.get("phone_number")
+            if not phone_number:
+                continue
+            if phone_number not in phone_groups:
+                phone_groups[phone_number] = []
+            phone_groups[phone_number].append(row)
+
+        results = []
+
+        # 🔹 Process each phone number group
+        for phone_number, calls in phone_groups.items():
+            print(f"[{datetime.now()}] Processing phone number: {phone_number} with {len(calls)} calls")
+            transcriptions = []
+
+            for call in calls:
+                recording_url = call.get("call_recording")
+                if not recording_url:
+                    continue
+
+                call_id = recording_url.split("/")[-2] if "/" in recording_url else None
+                if not call_id:
+                    continue
+
+                # Process recording -> transcription
+                result = await processor.process_call(account_id="562206937", call_id=call_id)
+                if result and "transcription" in result and result["transcription"]:
+                    transcriptions.append(result["transcription"])
+
+            if not transcriptions:
+                print(f"[{datetime.now()}] No valid transcriptions for {phone_number}")
+                continue
+
+            combined_transcription = "\n\n---\n\n".join(transcriptions)
+
+            # 🔹 Pick latest call for context
+            recent_call = calls[-1]
+
+            # Generate summary + scores
+            summary_response = await scoring_service.generate_summary(
+                transcription=combined_transcription,
+                client_type=recent_call.get("client_type"),
+                service=recent_call.get("service"),
+                state=recent_call.get("state"),
+                city=recent_call.get("city"),
+                first_call=recent_call.get("first_call"),
+                rota_plan=recent_call.get("rota_plan"),
+                previous_analysis=None,
+                client_id=recent_call.get("client_id")
+            )
+
+            analysis_summary = summary_response["summary"]
+
+            scores = await scoring_service.score_summary(
+                analysis_summary,
+                client_id=recent_call.get("client_id")
+            )
+
+            results.append({
+                "id": recent_call.get("id"),  # ✅ attach call ID here for update_call
+                "client_id": recent_call.get("client_id"),
+                "phone_number": phone_number,
+                "name": recent_call.get("name"),
+                "analysis_summary": analysis_summary,
+                'transcription': combined_transcription,
+                "intent_score": scores.intent_score,
+                "urgency_score": scores.urgency_score,
+                "overall_score": scores.overall_score,
+                "potential_score": scores.potential_score,
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+            # 🔹 Tell Laravel these calls were processed
+            # update_tasks = []
+            # for call in calls:
+            #     update_url = f"{API_URL}/api/update_call/{call['id']}"
+            #     update_tasks.append(mark_call_as_processed(update_url))
+            # await asyncio.gather(*update_tasks)
+
+        return {"data": results}
+
+    finally:
+        await Tortoise.close_connections()
+
+
+# async def mark_call_as_processed(update_url):
+#     async with httpx.AsyncClient(timeout=10.0) as client:
+#         try:
+#             response = await client.get(update_url, headers=headers)
+#             response.raise_for_status()
+#             if response.status_code == 200:
+#                 print(f"Marked call as processed: {update_url}")
+#             else:
+#                 print(f"Unexpected status for {update_url}: {response.status_code}")
+#         except Exception as e:
+#             print(f"Error in marking call: {update_url}, error: {e}")

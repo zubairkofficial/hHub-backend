@@ -14,6 +14,9 @@ from controller.business_post_image_generate_controller import router as generat
 from controller.test_fal_ai import router as test_fal_router
 from controller.post_history_controller import router as post_history_router
 from controller.score_request_controller import router as score_router
+from controller.client_lead_message_suggest import router as lead_message
+from controller.clientleads_and_callrail_controller import router as clientlead_router
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -34,6 +37,10 @@ app.include_router(business_post_router, prefix="/api", tags=["business-post"])
 app.include_router(post_prompt_setting_router, prefix="/api")
 app.include_router(post_history_router, prefix="/api", tags=["post_history"])
 app.include_router(score_router, prefix="/api", tags=["score"])
+app.include_router(lead_message, prefix="/api", tags=["lead-message"])
+app.include_router(clientlead_router, prefix="/api", tags=["client-leads"])
+
+
 # generated images for post
 app.include_router(generate_images_for_post_router, prefix="/api")
 # test fal ai

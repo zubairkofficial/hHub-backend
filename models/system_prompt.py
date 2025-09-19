@@ -7,6 +7,7 @@ class SystemPrompts(Model):
     system_prompt = fields.TextField()
     analytics_prompt = fields.TextField()
     summery_score = fields.TextField()
+    message_prompt = fields.TextField(null=True)  # New column for dynamic prompts
     hour = fields.TextField(defualt="1",null=True)
     role_name = fields.CharField(max_length=255, null=True)  # New column
     client_id = fields.IntField(null=True)  # New column

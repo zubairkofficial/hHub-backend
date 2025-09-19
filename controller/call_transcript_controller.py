@@ -1844,6 +1844,7 @@ class SystemPrompt(BaseModel):
     analytics_prompt: str
     summery_score: str
     hour: str
+    message_prompt: Optional[str] = None  # Add message_prompt to the model
     client_id: Optional[int] = None  # Allow null client_id
     role_name: Optional[str] = None  # Allow null role_name
 
@@ -1855,22 +1856,25 @@ async def system_prompt_create_or_update(prompt: SystemPrompt):
         if prompt.role_name and prompt.role_name not in valid_roles:
             raise HTTPException(status_code=400, detail=f"Invalid role_name. Must be one of {valid_roles}")
 
+        # Find the existing prompt based on client_id and role_name
         obj = await SystemPrompts.filter(
             client_id=prompt.client_id,
             role_name=prompt.role_name
         ).first()
 
+        # If the prompt exists, update it
         if obj:
+            # Ensure the message_prompt is included in the update
             await obj.update_from_dict(prompt.dict(exclude_unset=True))
             await obj.save()
             return {"message": "Prompt updated successfully", "id": obj.id}
-        else:
-            obj = await SystemPrompts.create(**prompt.dict())
-            return {"message": "Prompt created successfully", "id": obj.id}
+
+        # If no existing prompt, create a new one
+        obj = await SystemPrompts.create(**prompt.dict())
+        return {"message": "Prompt created successfully", "id": obj.id}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error while saving {str(e)}")
-
 
 @router.get("/prompt")
 async def system_prompt_get(
@@ -1882,6 +1886,7 @@ async def system_prompt_get(
         if role_name and role_name not in valid_roles:
             raise HTTPException(status_code=400, detail=f"Invalid role_name. Must be one of {valid_roles}")
 
+        # Fetch the prompt based on the client_id and role_name
         if role_name == "Super Admin" or client_id is None or role_name in ["Employee", "Project Manager"]:
             system_prompt = await SystemPrompts.filter(role_name="Super Admin", client_id=None).first()
             if not system_prompt:
@@ -1891,7 +1896,8 @@ async def system_prompt_get(
                     summery_score="Default score",
                     hour="1",
                     client_id=None,
-                    role_name="Super Admin"
+                    role_name="Super Admin",
+                    message_prompt="Default Super Admin message prompt"  # Add default message prompt
                 )
         elif role_name == "Client" and client_id is not None:
             system_prompt = await SystemPrompts.filter(role_name="Client", client_id=client_id).first()
@@ -1904,7 +1910,8 @@ async def system_prompt_get(
                         summery_score="Default score",
                         hour="1",
                         client_id=None,
-                        role_name="Super Admin"
+                        role_name="Super Admin",
+                        message_prompt="Default Super Admin message prompt"  # Add default message prompt
                     )
         else:
             system_prompt = await SystemPrompts.filter(role_name="Super Admin", client_id=None).first()
@@ -1915,9 +1922,11 @@ async def system_prompt_get(
                     summery_score="Default score",
                     hour="1",
                     client_id=None,
-                    role_name="Super Admin"
+                    role_name="Super Admin",
+                    message_prompt="Default Super Admin message prompt"  # Add default message prompt
                 )
 
+        # Prepare response
         prompt_response = {
             "id": system_prompt.id,
             "system_prompt": system_prompt.system_prompt,
@@ -1926,9 +1935,11 @@ async def system_prompt_get(
             "hour": system_prompt.hour,
             "client_id": system_prompt.client_id,
             "role_name": system_prompt.role_name,
+            "message_prompt": system_prompt.message_prompt,  # Include message_prompt in the response
             "created_at": system_prompt.created_at.isoformat(),
             "updated_at": system_prompt.updated_at.isoformat()
         }
+
         return {"success": True, "message": "Prompt fetched successfully", "prompt": prompt_response}
 
     except Exception as e:

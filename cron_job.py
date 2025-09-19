@@ -98,6 +98,7 @@ async def main():
         logger.info("\n=== Cron job completed ===")
         logger.info(f"Processed {len(results)} users ({completed} successfully)")
         logger.info(f"Total records processed: {total_processed}")
+        
 
     except Exception as e:
         logger.exception(f"Fatal error in main: {e}")
