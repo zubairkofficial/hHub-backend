@@ -1,12 +1,15 @@
+# E:\Shoaib\Projects\hHub\hHub-backend\controller\client_lead_message_suggest.py
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Set
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from helper.post_setting_helper import get_settings
 from models.system_prompt import SystemPrompts  # Assuming you have this model
 import json
+import re
 
 router = APIRouter()
 
@@ -34,24 +37,42 @@ class FollowupDecision(BaseModel):
     used_lead_ids: List[int] = []
 
 
+# ---------- Helpers ----------
+ALLOWED_VARS: Set[str] = {"format_instructions", "mean_potential", "items_json"}
+
+def sanitize_db_prompt(raw: Optional[str], allowed: Set[str] = ALLOWED_VARS) -> str:
+    """
+    Make DB-stored prompts safe for Python str.format by:
+      1) Escaping ALL braces to literal text
+      2) Un-escaping ONLY the placeholders we actually provide
+    So stray {description}, {transcription}, etc. won't raise KeyError.
+    """
+    if not raw:
+        return ""
+    s = raw.replace("{", "{{").replace("}", "}}")
+    for var in allowed:
+        s = s.replace("{{" + var + "}}", "{" + var + "}")
+    return s
+
+
 # Fetch SystemPrompt from the DB or use default if not found
 async def get_prompt_for_client(client_id: Optional[int]) -> str:
     if client_id:
         prompt = await SystemPrompts.filter(client_id=client_id).first()
-        if prompt and prompt.message_prompt:
+        if prompt and getattr(prompt, "message_prompt", None):
             return prompt.message_prompt
-    
+
     # Fallback to default prompt if client_id is not found or message_prompt is None
     default_prompt = await SystemPrompts.filter(client_id=None, role_name="Super Admin").first()
-    
-    # If no prompt found, return a default message
-    return default_prompt.message_prompt if default_prompt else "Default message prompt for clients."
+    return default_prompt.message_prompt if (default_prompt and getattr(default_prompt, "message_prompt", None)) else "Default message prompt for clients."
+
 
 def _mean_score(items: List[LeadItem]) -> float:
     if not items:
         return 0.0
     s = sum(float(x.potential_score or 0.0) for x in items)
     return round(s / len(items), 3)
+
 
 class FollowupSuggestService:
     def __init__(self):
@@ -63,7 +84,7 @@ class FollowupSuggestService:
             settings = await get_settings()
             api_key = settings["openai_api_key"]
             self.llm = ChatOpenAI(
-                model="gpt-4o-mini",  # consistent with your app
+                model="gpt-4o-mini",   # keep consistent with your app
                 temperature=0.2,
                 api_key=api_key,
             )
@@ -88,14 +109,16 @@ class FollowupSuggestService:
         mean_potential = _mean_score(items)
 
         # Get client-specific or default prompt dynamically
-        message_prompt = await get_prompt_for_client(client_id)
+        message_prompt_raw = await get_prompt_for_client(client_id)
+        # Ensure non-empty string
+        message_prompt_raw = message_prompt_raw or "Default message prompt."
 
-        # Ensure message_prompt is not None and is a string
-        message_prompt = message_prompt or "Default message prompt."
+        # 🔒 Sanitize to prevent KeyError on unknown placeholders
+        message_prompt = sanitize_db_prompt(message_prompt_raw, ALLOWED_VARS)
 
-        # Create prompt with dynamic message
-        prompt = ChatPromptTemplate.from_messages([ 
-            ("system", message_prompt + "\n{format_instructions}"),  # concatenating the valid string
+        # Create prompt with dynamic message (batch-first; only allowed variables used)
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", message_prompt + "\n{format_instructions}"),
             ("user",
              "Context:\n"
              "- mean_potential_score: {mean_potential}\n"
@@ -104,11 +127,32 @@ class FollowupSuggestService:
              "Return ONLY the JSON (no prose).")
         ])
 
-        formatted = prompt.format_messages(
-            format_instructions=self.parser.get_format_instructions(),
-            mean_potential=mean_potential,
-            items_json=json.dumps([i.model_dump() for i in items], ensure_ascii=False)
-        )
+        # Prepare variables for formatting
+        kwargs = {
+            "format_instructions": self.parser.get_format_instructions(),
+            "mean_potential": mean_potential,
+            "items_json": json.dumps([i.model_dump() for i in items], ensure_ascii=False),
+        }
+
+        # Fail fast with a helpful 400 if any stray placeholder somehow remains
+        try:
+            formatted = prompt.format_messages(**kwargs)
+        except KeyError as e:
+            missing = str(e).strip("'")
+            # Provide a clear error to the caller instead of a 500
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "prompt_placeholder_missing",
+                    "missing": missing,
+                    "hint": (
+                        "Sanitize the DB prompt or include the placeholder in ALLOWED_VARS "
+                        "and supply its value. Current allowed: "
+                        f"{sorted(list(ALLOWED_VARS))}"
+                    ),
+                    "raw_prompt_excerpt": message_prompt_raw[:2000],  # small excerpt for debugging
+                },
+            )
 
         try:
             resp = await self.llm.ainvoke(formatted)
@@ -121,9 +165,17 @@ class FollowupSuggestService:
                 data["reason"] = (data.get("reason") or "") + " | Missing primary_message."
                 data["confidence"] = min(0.5, float(data.get("confidence") or 0.5))
 
+            # Ensure used_lead_ids is filled (nice for downstream)
+            if not data.get("used_lead_ids"):
+                data["used_lead_ids"] = [it.id for it in items]
+
             return data
 
+        except HTTPException:
+            # Bubble up our explicit HTTP errors unchanged
+            raise
         except Exception as e:
+            # Convert any other LLM/runtime issues to a structured hold
             return {
                 "decision": "hold",
                 "reason": f"LLM error: {e}",
@@ -134,8 +186,9 @@ class FollowupSuggestService:
                 "primary_message": "",
                 "variants": [],
                 "safety_flags": ["llm_error"],
-                "used_lead_ids": []
+                "used_lead_ids": [it.id for it in items],
             }
+
 
 service = FollowupSuggestService()
 
