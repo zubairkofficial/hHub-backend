@@ -37,6 +37,7 @@ async def main(score_payload:ScorePayload):
     try:
         logger.info("=== Starting cron job ===")
         logger.info("Fetching users and client data...")
+        # users_data = await get_users_by_client(score_payload.user_id)
         users_data = await get_users_by_client(score_payload.user_id)
 
         if not users_data or not users_data.get('data'):
