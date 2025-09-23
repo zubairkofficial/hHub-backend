@@ -104,9 +104,11 @@ class LeadScoringService:
     async def score_summary(self, analysis_summary: str,client_id: Optional[int] = None) -> LeadAnalysis:
         await self._init_llm()
         prompts = await self.get_prompts(client_id=client_id)
-        print(f"bhai client_id = {client_id}")
+        print(f"bhai client_id = {client_id} or neechy wala score prompt hai")
         print(prompts['score_prompt'])
-      
+        print("yeh raha analysis summary:")
+        print(analysis_summary)
+    
         score_prompt = ChatPromptTemplate.from_messages([ 
             ("system", prompts['score_prompt']),
             ("user", "Analysis Summary:\n{analysis_summary}")
