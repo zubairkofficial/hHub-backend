@@ -31,6 +31,8 @@ async def fetch_client_leads_and_callrail(request: Request):
         call_records = payload.get("data", [])
         print("First record type:", type(call_records[0]) if call_records else None)
 
+        print(f"all call records: {call_records}")
+
         if not call_records:
             return {"status": "error", "message": "No call records provided", "data": []}
 

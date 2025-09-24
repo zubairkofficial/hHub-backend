@@ -14,7 +14,13 @@ from helper.post_setting_helper import get_settings
 from openai import OpenAI
 from helper.helper import get_image_path, image_to_base64, save_base64_image,get_aspect_ratio
 from helper.design_styles import design_styles  # Import design_styles
-
+# banana api testing
+from io import BytesIO
+from PIL import Image
+from google import genai
+# from google.genai import types
+import asyncio
+from uuid import uuid4
 router = APIRouter()
 
 class GenerateImageForPostRequest(BaseModel):
@@ -24,6 +30,9 @@ class GenerateImageForPostRequest(BaseModel):
     instruction: str
     image_type: str
 
+# Ensures a directory exists
+def _ensure_dir(path: str):
+    os.makedirs(path, exist_ok=True)
 async def get_user_refference_images(request):
     """Fetch settings for the user and image generation."""
     print(f"user setting id = {request.user_id}")
@@ -240,6 +249,55 @@ async def replace_text_and_visuals(prompt, image_filename):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+async def replace_text_and_visuals_gemini(prompt: str, image_filename: str):
+    """
+    Use Gemini API to replace visuals (and optionally text), by supplying a prompt + reference image.
+    Returns {'image_id': <saved filename>}.
+    """
+    try:
+        client: genai.Client = genai.Client()
+
+        # Step 1: Load reference image
+        image_path = get_image_path("reference_images", image_filename)
+        input_image = Image.open(image_path)
+
+        # Step 2: Gemini API call, offloaded to thread to keep async performance
+        def _call_gemini():
+            return client.models.generate_content(
+                model="gemini-2.5-flash-image-preview",
+                contents=[prompt, input_image],
+            )
+
+        response = await asyncio.to_thread(_call_gemini)
+
+        # Step 3: Parse output and save first image
+        try:
+            parts = response.candidates[0].content.parts
+            print(f"parts in try {parts}")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Unexpected Gemini response: no content parts")
+
+        for part in parts:
+            if getattr(part, "inline_data", None) is not None:
+                img_bytes = part.inline_data.data  # raw image bytes
+                img = Image.open(BytesIO(img_bytes))
+
+                out_dir = get_image_path("temp_images", "")
+                _ensure_dir(out_dir)
+
+                out_name = f"gemini_{uuid4().hex}.png"
+                out_path = os.path.join(out_dir, out_name)
+                img.save(out_path, format="PNG")
+                return {"image_id": out_name}
+
+        raise HTTPException(status_code=500, detail="No image output found in Gemini response")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/business-post/generate-image-for-post")
 async def generate_image_for_post(request: GenerateImageForPostRequest, image_no: int = Query(0)):
     try:
@@ -271,7 +329,8 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         print(f"final we get prompt")
         
         # Replace text and visuals using the new function
-        result = await replace_text_and_visuals(prompt, image_filename)
+        # result = await replace_text_and_visuals(prompt, image_filename)
+        result = await replace_text_and_visuals_gemini(prompt, image_filename)
         
         # Return image details
         image_obj = {

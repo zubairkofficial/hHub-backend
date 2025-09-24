@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from helper.database import Database
 from helper.call_processor import CallProcessor
 from helper.lead_scoring import LeadScoringService
@@ -10,14 +10,10 @@ import httpx
 import os
 import base64
 from pathlib import Path
-import os
-import base64
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+
+from typing import Dict, List, Optional, Tuple, Any
 import json
 import re
-import asyncio
 from fastapi import APIRouter, Request
 
 router = APIRouter()
@@ -40,6 +36,33 @@ headers = {
     "upgrade-insecure-requests": "1",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
 }
+# ───────────────────────── Date parsing helper (ADD THIS) ─────────────────────────
+
+
+def _parse_any_dt(d: Optional[str]) -> Optional[datetime]:
+    """
+    Best-effort parser for your call record timestamps.
+    Accepts:
+      - 'YYYY-mm-dd HH:MM:SS'
+      - ISO8601 with 'Z' or timezone, with or without micros
+      - None/empty -> None
+    """
+    if not d:
+        return None
+    try:
+        s = str(d).strip().strip('"').strip("'")
+        if not s:
+            return None
+        # If 'T' style and Zulu, normalize to +00:00
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        # If it’s plain 'YYYY-mm-dd HH:MM:SS', make it ISO by inserting 'T'
+        if "T" not in s and len(s) >= 19 and s[10] == " ":
+            s = s[:10] + "T" + s[11:]
+        return datetime.fromisoformat(s)
+    except Exception:
+        return None
+
 
 async def process_unprocessed_callrails():
     # Initialize Tortoise ORM
@@ -123,7 +146,7 @@ async def process_unprocessed_callrails():
                     overall_score=scores.overall_score,
                     updated_at=datetime.now()
                 )
-                print(f"[{datetime.now()}] Updated lead score for {phone_number}")
+       
             else:
                 await LeadScore.create(
                     client_id=recent_call.get("client_id"),
@@ -137,7 +160,7 @@ async def process_unprocessed_callrails():
                     created_at=datetime.now(),
                     updated_at=datetime.now()
                 )
-                print(f"[{datetime.now()}] Created new lead score for {phone_number}")
+
             # 6. Mark all these calls as processed via Laravel API
             update_tasks = []
             for call in calls:
@@ -200,7 +223,10 @@ async def _download_bytes(client: httpx.AsyncClient, url: str, headers: Dict[str
       - JSON wrappers that contain a URL
     Returns: (bytes, content_type)
     """
-    r = await client.get(url, headers=headers, allow_redirects=True)
+    # OLD: allow_redirects=True  ❌
+    # r = await client.get(url, headers=headers, allow_redirects=True)
+    r = await client.get(url, headers=headers, follow_redirects=True)   # ✅
+
     ct = r.headers.get("content-type", "").lower()
 
     # JSON wrapper case (sometimes the first hop is JSON)
@@ -211,7 +237,9 @@ async def _download_bytes(client: httpx.AsyncClient, url: str, headers: Dict[str
             for k in ("url", "download_url", "href", "recording_url"):
                 real = data.get(k)
                 if isinstance(real, str):
-                    r2 = await client.get(real, headers=headers, allow_redirects=True)
+                    # OLD: allow_redirects=True  ❌
+                    # r2 = await client.get(real, headers=headers, allow_redirects=True)
+                    r2 = await client.get(real, headers=headers, follow_redirects=True)  # ✅
                     return (r2.content, r2.headers.get("content-type", "application/octet-stream"))
         except Exception:
             pass  # fall through
@@ -244,8 +272,9 @@ async def _fetch_audio_b64_from_callrail(recording_url: str) -> Optional[Dict]:
     if CALLRAIL_API_KEY:
         headers["Authorization"] = f"Token token={CALLRAIL_API_KEY}"
 
-    async with httpx.AsyncClient(timeout=CALLRAIL_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=CALLRAIL_TIMEOUT, follow_redirects=True) as client:  # ✅
         audio_bytes, content_type = await _download_bytes(client, url, headers)
+
 
     if not audio_bytes:
         return None
@@ -262,51 +291,66 @@ async def _fetch_audio_b64_from_callrail(recording_url: str) -> Optional[Dict]:
 
 # ───────────────────────── Core logic ─────────────────────────
 
-async def process_unprocessed_callrails_no_store(call_data: List[dict]):
+# ───────────────────────── Core logic (REPLACE YOUR FUNCTION WITH THIS) ─────────────────────────
+async def process_unprocessed_callrails_no_store(call_data: List[dict]) -> Dict[str, Any]:
     """
-    Your original function, extended to include a `recordings` array with Base64 audio.
-    Does NOT save to any DB on the Python side.
+    Aggregates per phone number. For each phone group:
+      - Fetches/transcribes each recording (keeps your existing pipeline)
+      - Returns ONE result object containing:
+          transcription (combined), analysis/score fields,
+          and recordings[] with base64 blobs for ALL calls in the group.
+    Does NOT write to any DB.
     """
-    # Init ORM if your scoring/transcription services rely on DB models.
-    # If not needed, you can remove the Tortoise calls.
-    await Tortoise.init(config=TORTOISE_CONFIG)            # noqa: F821
-    await Tortoise.generate_schemas()                      # noqa: F821
+    tortoise_inited = False
+    # Initialize Tortoise only if available in this runtime
     try:
-        # Filter those that are not processed yet (same as your code)
-        rows = [row for row in call_data if not row.get("is_processed")]
+        await Tortoise.init(config=TORTOISE_CONFIG)  # you already import this at top
+        await Tortoise.generate_schemas()
+        tortoise_inited = True
+    except Exception:
+        # Safe to continue if your scoring/transcription does not require DB
+        pass
+
+    try:
+        # ✅ process everything that has a phone number
+        rows = [row for row in call_data if row.get("phone_number")]
 
         if not rows:
-            print(f"[{datetime.now()}] No unprocessed callrails found.")
+            # print(f"[{datetime.now()}] No rows with phone_number.")
             return {"data": []}
 
         # Group by phone
         phone_groups: Dict[str, List[dict]] = {}
         for row in rows:
-            pn = row.get("phone_number")
-            if not pn:
-                continue
-            phone_groups.setdefault(pn, []).append(row)
+            phone_groups.setdefault(row["phone_number"], []).append(row)
 
-        results = []
+        results: List[Dict[str, Any]] = []
 
         for phone_number, calls in phone_groups.items():
-            print(f"[{datetime.now()}] Processing phone number: {phone_number} with {len(calls)} calls")
+            # ✅ deterministic order (oldest → newest) using date/created_at/updated_at
+            def _sort_key(r: dict):
+                for k in ("date", "created_at", "updated_at"):
+                    dt = _parse_any_dt(r.get(k))
+                    if dt:
+                        return dt
+                # fallback: stable string
+                return str(r.get("date") or r.get("created_at") or r.get("updated_at") or "")
+
+            calls.sort(key=_sort_key)
+
             transcriptions: List[str] = []
             recordings_out: List[dict] = []
 
-            # Process each call in group
             for call in calls:
-                recording_url = call.get("call_recording")
+                recording_url = call.get("call_recording") or call.get("recording")
                 if not recording_url:
                     continue
 
-                # 1) Transcription (your existing pipeline)
-                #    Keep exactly what you had; we won’t force changes to your processor.
-                #    If you prefer to transcribe from our bytes, you can add that path too.
+                # 1) Transcription via your existing processor (optional)
                 call_id = _extract_call_id_from_url(recording_url) or "call"
                 try:
-                    result = await processor.process_call(  # noqa: F821
-                        account_id=CALLRAIL_ACCOUNT_ID or "562206937",
+                    result = await processor.process_call(
+                        account_id=(CALLRAIL_ACCOUNT_ID or "562206937"),
                         call_id=call_id
                     )
                     if result and result.get("transcription"):
@@ -314,14 +358,13 @@ async def process_unprocessed_callrails_no_store(call_data: List[dict]):
                 except Exception as e:
                     print(f"Transcription error for {phone_number}/{call_id}: {e}")
 
-                # 2) Raw audio for Laravel (Base64)
+                # 2) Raw audio (base64) for Laravel
                 try:
                     rec = await _fetch_audio_b64_from_callrail(recording_url)
                     if rec:
-                        # If you keep duration in your original CallRail row:
                         dur = call.get("duration")
                         if dur is not None:
-                            rec["duration"] = str(dur)
+                            rec["duration"] = str(dur)  # keep it as string for PHP writer
                         recordings_out.append(rec)
                 except Exception as e:
                     print(f"Audio fetch error for {phone_number}: {e}")
@@ -331,17 +374,19 @@ async def process_unprocessed_callrails_no_store(call_data: List[dict]):
                 continue
 
             combined_transcription = "\n\n---\n\n".join(transcriptions) if transcriptions else None
+            recent_call = calls[-1]  # newest after sort
 
-            # Latest call for context
-            recent_call = calls[-1]
+            # Defaults
+            analysis_summary: Optional[str] = None
+            intent_score: Optional[float] = None
+            urgency_score: Optional[float] = None
+            overall_score: Optional[float] = None
+            potential_score: Optional[float] = None
 
-            # Build scores/summary if you have a transcript; otherwise you can still send recordings only.
-            analysis_summary = None
-            intent_score = urgency_score = overall_score = potential_score = None
-
+            # Optional LLM summary + scoring if we have a transcript
             if combined_transcription:
                 try:
-                    summary_response = await scoring_service.generate_summary(  # noqa: F821
+                    summary_response = await scoring_service.generate_summary(
                         transcription=combined_transcription,
                         client_type=recent_call.get("client_type"),
                         service=recent_call.get("service"),
@@ -352,19 +397,26 @@ async def process_unprocessed_callrails_no_store(call_data: List[dict]):
                         previous_analysis=None,
                         client_id=recent_call.get("client_id"),
                     )
-                    analysis_summary = summary_response.get("summary")
+                    analysis_summary = (summary_response or {}).get("summary")
                 except Exception as e:
                     print(f"Summary error for {phone_number}: {e}")
 
                 try:
-                    scores = await scoring_service.score_summary(             # noqa: F821
+                    scores = await scoring_service.score_summary(
                         analysis_summary or "",
                         client_id=recent_call.get("client_id")
                     )
-                    intent_score = getattr(scores, "intent_score", None)
-                    urgency_score = getattr(scores, "urgency_score", None)
-                    overall_score = getattr(scores, "overall_score", None)
-                    potential_score = getattr(scores, "potential_score", None)
+                    # handle both object-like and dict-like
+                    if isinstance(scores, dict):
+                        intent_score = scores.get("intent_score")
+                        urgency_score = scores.get("urgency_score")
+                        overall_score = scores.get("overall_score")
+                        potential_score = scores.get("potential_score")
+                    else:
+                        intent_score = getattr(scores, "intent_score", None)
+                        urgency_score = getattr(scores, "urgency_score", None)
+                        overall_score = getattr(scores, "overall_score", None)
+                        potential_score = getattr(scores, "potential_score", None)
                 except Exception as e:
                     print(f"Scoring error for {phone_number}: {e}")
 
@@ -380,15 +432,16 @@ async def process_unprocessed_callrails_no_store(call_data: List[dict]):
                 "overall_score": overall_score,
                 "potential_score": potential_score,
                 "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                # NEW: local-ready audio payload(s)
-                "recordings": recordings_out,   # [{ filename, mime, duration?, data_b64 }]
+                # ✅ All recordings for this phone group
+                "recordings": recordings_out,  # [{ filename, mime, duration?, data_b64 }]
             })
 
         return {"data": results}
 
     finally:
-        await Tortoise.close_connections()
-
-
-
-
+        if tortoise_inited:
+            try:
+                await Tortoise.close_connections()
+            except Exception:
+                pass
+# shoaib code end#
