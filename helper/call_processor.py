@@ -6,6 +6,7 @@ from datetime import datetime
 import traceback
 from dotenv import load_dotenv
 import subprocess
+from helper.format_transcription import format_transcription
 
 # --- ASR engine: faster-whisper ---
 from faster_whisper import WhisperModel
@@ -198,9 +199,14 @@ class CallProcessor:
         transcription_result = self.transcribe_audio(audio_path)
         if not transcription_result:
             return {'error': 'Failed to transcribe audio'}
+        
+
+        formatted_text = format_transcription(transcription_result['transcription'], output="markdown")
+        # or output="html" if your frontend does not render Markdown
+
         return {
             'status': 'success',
-            'transcription': transcription_result['transcription'],
+            'transcription': formatted_text,
             'language': transcription_result['language'],
             'processed_at': datetime.now().isoformat()
         }

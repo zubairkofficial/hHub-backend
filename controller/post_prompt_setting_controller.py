@@ -1,8 +1,8 @@
-from fastapi import APIRouter,HTTPException
+# controller/post_prompt_setting_controller.py
+from fastapi import APIRouter, HTTPException
 from models.post_prompt_settings import PostPromptSettings
 
 router = APIRouter()
-# --- Super Admin Post Prompt Endpoints ---
 
 @router.get("/post-prompts")
 async def get_post_prompts():
@@ -14,7 +14,7 @@ async def get_post_prompts():
             "image_prompt": "",
             "fal_ai_api_key": "",
             "openai_api_key": "",
-            
+            "gemini_api_key": "",  # ← NEW
         }
     return {
         "post_prompt": prompt.post_prompt,
@@ -22,6 +22,7 @@ async def get_post_prompts():
         "image_prompt": prompt.image_prompt,
         "fal_ai_api_key": prompt.fal_ai_api_key,
         "openai_api_key": prompt.openai_api_key,
+        "gemini_api_key": prompt.gemini_api_key,  # ← NEW
     }
 
 @router.post("/post-prompts")
@@ -34,6 +35,7 @@ async def update_post_prompts(data: dict):
             image_prompt=data.get("image_prompt"),
             fal_ai_api_key=data.get("fal_ai_api_key"),
             openai_api_key=data.get("openai_api_key"),
+            gemini_api_key=data.get("gemini_api_key"),  # ← NEW
         )
     else:
         prompt.post_prompt = data.get("post_prompt", prompt.post_prompt)
@@ -41,12 +43,14 @@ async def update_post_prompts(data: dict):
         prompt.image_prompt = data.get("image_prompt", prompt.image_prompt)
         prompt.fal_ai_api_key = data.get("fal_ai_api_key", prompt.fal_ai_api_key)
         prompt.openai_api_key = data.get("openai_api_key", prompt.openai_api_key)
+        prompt.gemini_api_key = data.get("gemini_api_key", prompt.gemini_api_key)  # ← NEW
         await prompt.save()
+
     return {
         "post_prompt": prompt.post_prompt,
         "idea_prompt": prompt.idea_prompt,
         "image_prompt": prompt.image_prompt,
         "fal_ai_api_key": prompt.fal_ai_api_key,
         "openai_api_key": prompt.openai_api_key,
+        "gemini_api_key": prompt.gemini_api_key,  # ← NEW
     }
-
