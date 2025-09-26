@@ -6,7 +6,8 @@ from datetime import datetime
 import traceback
 from dotenv import load_dotenv
 import subprocess
-from helper.format_transcription import format_transcription
+from helper.format_transcription import format_transcription_ai
+
 
 # --- ASR engine: faster-whisper ---
 from faster_whisper import WhisperModel
@@ -201,7 +202,7 @@ class CallProcessor:
             return {'error': 'Failed to transcribe audio'}
         
 
-        formatted_text = format_transcription(transcription_result['transcription'], output="markdown")
+        formatted_text = await format_transcription_ai(transcription_result['transcription'],output="markdown",)
         # or output="html" if your frontend does not render Markdown
 
         return {
