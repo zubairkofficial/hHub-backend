@@ -97,10 +97,17 @@ async def build_prompt(image_no, post_data, image_type):
     if image_type == "image_only":
         prompt = (
             f"{object_replacement_instruction}\n"
+            f"Generate a new image version by replacing the visual objects from the reference image, without any text elements.\n" # Clarified intent
+            f"Maintain the same number of objects as in the original reference image.\n\n" # Explicitly state object count
+            
+            f"**Design Constraints:**\n"
             f"Match the visual style of the reference — {image_design} ({design_description}).\n"
             f"Do **not** change the original background. The background color, pattern, and style must remain exactly as in the reference image.\n"
-            f"Design Style: {image_design} ({design_description})\n"
-            f"Do not add any textual elements, logos, or URLs. Keep the design clean, modern, and visually meaningful.\n"
+            f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n" # Added realism/stylization
+            
+            f"**Negative Prompts (Applicable to Reference and New Elements):**\n"
+            f"Do not include or replicate any textual elements (including titles or descriptions), logos, QR codes, URLs, icons, addresses, phone numbers, emails, or any unrelated decorative elements. This applies to elements from the reference image as well as new additions.\n" # Consolidated and strengthened
+            f"Keep the design clean, modern, and visually meaningful.\n\n"
             f"Do **not** add additional text on the image except for the title and description.\n\n"
             f"Additional Instructions: {instruction}\n"
         )
@@ -112,8 +119,10 @@ async def build_prompt(image_no, post_data, image_type):
             f"Do not add any visual elements such as icons, images, or logos. "
             f"Ensure the new title and description match the font style, spacing, and layout of the original image.\n\n"
             f"Title: '{title}'\n"
+            f"**Design Constraints:**\n"
             f"Description: '{description}'\n\n"
             f"Design Style: {image_design} ({design_description})\n"
+            f"**Negative Prompts:**\n"
             f"Exclusions: No URLs, icons, logos, address, phone, emails or PNG images should be added.\n"
             f"Do **not** add additional text on the image except for the title and description.\n\n"
             f"Additional Instructions: {instruction}"
@@ -128,12 +137,14 @@ async def build_prompt(image_no, post_data, image_type):
             f"   - Title: '{title}'\n"
             f"   - Description: '{description}'\n\n"
             f"2. Replace the detected objects with new ones as described above, maintaining the same number of objects.\n\n"
+            f"**Design Constraints:**\n"
             f"Do **not** change the original background. The background color, pattern, and style must remain exactly as in the reference image.\n"
             f"The new image should preserve the original design's layout, background, color palette, typography, font size, and spacing. "
             f"The new title and description should be clearly visible and integrated into the image as styled text, just like in the original.\n"
             f"Match the visual style of the reference — {image_design} ({design_description}).\n"
             f"Ensure the image is realistic if '{image_design}' starts with 'realistic_image', or stylized if it starts with 'digital_illustration' or 'vector_illustration'.\n"
-            f"Do not add logos, QR codes, URLs, icons, address, phone, emails or unrelated decorative elements.\n\n"
+            f"**Negative Prompts (Applicable to Reference and New Elements):**\n"
+            f"Do not include or replicate any logos, QR codes, URLs, icons, addresses, phone numbers, emails, or unrelated decorative elements. This applies to elements from the reference image as well as new additions.\n\n"
             f"Do **not** add additional text on the image except for the title and description.\n\n"
             f"Additional Instructions: {instruction}\n"
         )
