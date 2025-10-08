@@ -1,4 +1,3 @@
-# E:\Shoaib\Projects\hHub\hHub-backend\helper\format_transcription.py
 from __future__ import annotations
 
 import os

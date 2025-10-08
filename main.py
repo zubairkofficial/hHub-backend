@@ -16,6 +16,7 @@ from controller.post_history_controller import router as post_history_router
 from controller.score_request_controller import router as score_router
 from controller.client_lead_message_suggest import router as lead_message
 from controller.clientleads_and_callrail_controller import router as clientlead_router
+from controller.chat_widget_controller import router as chat_widget_router
 
 
 app = FastAPI(lifespan=lifespan)
@@ -45,11 +46,13 @@ app.include_router(clientlead_router, prefix="/api", tags=["client-leads"])
 app.include_router(generate_images_for_post_router, prefix="/api")
 # test fal ai
 app.include_router(test_fal_router, prefix="/api", tags=["test"])
+# ✅ mount the widget chat API (same paths your Livewire already uses via FastAPI)
+# app.include_router(chat_widget_router, prefix="/api", tags=["chat-widget"])
 
 
 
 
 @app.get('/')
 def default_api():
-    return "Hello to the world of AI"
+    return "Hello to the world of AI"   
 
