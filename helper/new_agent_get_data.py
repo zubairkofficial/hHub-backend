@@ -40,7 +40,7 @@ async def get_client_data(user_id: int):
             del clinic_cache[user_id]
 
     # If not in cache or cache expired, make a fresh API call
-    async with httpx.AsyncClient(timeout=300.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         try:
             url = f"{LARAVEL_API_URL}/api/clinic/{user_id}"
             print(f"Making fresh API call to: {url}")
@@ -50,7 +50,7 @@ async def get_client_data(user_id: int):
             
             if response.status_code == 200:
                 clinics = response.json()
-                # print(f"Response data: {clinics}")
+                print(f"Response data: {clinics}")
                 
                 if clinics.get('success', False):
                     client_details = clinics['data'].get('clients', [])
@@ -86,7 +86,7 @@ async def get_client_data(user_id: int):
                             "id": score.id,
                             "client_id": score.client_id,
                             "callrail_id": score.callrail_id,
-                            # "analysis_summary": score.analysis_summary,
+                            "analysis_summary": score.analysis_summary,
                             "intent_score": score.intent_score,
                             "urgency_score": score.urgency_score,
                             "overall_score": score.overall_score,
@@ -146,7 +146,7 @@ async def get_client_data(user_id: int):
             else:
                 print(f"Non-200 status code: {response.status_code}, Response: {response.text}")
                 return None
-    
+
         except httpx.RequestError as e:
             print(f"Request Error: {str(e)}")
             return None

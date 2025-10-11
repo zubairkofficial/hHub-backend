@@ -117,48 +117,89 @@ async def get_chat_messages(chat_id: int, user_id: str):
     ) for msg in messages]
   
 
+# @router.post("/messages", response_model=MessageResponse)
+# async def send_message(message_data: MessageCreate):
+#     try:
+#         ai_response = await generate_ai_response(message_data.user_message, message_data.chat_id, message_data.user_id)
+
+#         message = await Message.create(
+#             user_id=message_data.user_id,
+#             chat_id=message_data.chat_id,
+#             user_message=message_data.user_message,
+#             bot_response=ai_response
+#         )
+
+#         chat = await Chat.get(id=message_data.chat_id)
+#         if chat.title == "New Chat" and message_data.user_message.strip():
+#             title_words = message_data.user_message.split()[:5]
+#             new_title = " ".join(title_words)
+#             if len(new_title) > 50:
+#                 new_title = new_title[:47] + "..."
+#             chat.title = new_title
+#         chat.updated_at = datetime.now()
+#         await chat.save()
+
+#         # 🔥 NEW: parse & execute actions
+#         actions = parse_actions(message_data.user_message)
+#         for a in actions:
+#             if a.name == "notify":
+#                 await push_notification(
+#                     user_id=message_data.user_id,
+#                     title=a.params.get("title", "Notification"),
+#                     body=a.params.get("body", ""),
+#                     data={"chat_id": message_data.chat_id, "tag": a.params.get("tag", "general")}
+#                 )
+#             elif a.name == "create_reminder":
+#                 await create_reminder(
+#                     user_id=message_data.user_id,
+#                     message=a.params.get("message", ""),
+#                     due_at_utc=a.params.get("when_utc"),
+#                     meta={"chat_id": message_data.chat_id}
+#                 )
+#                 # Optional immediate ack to the user (extra message):
+#                 # await Message.create(...)
+
+#         return MessageResponse(
+#             id=message.id,
+#             user_id=message.user_id,
+#             chat_id=message.chat_id,
+#             user_message=message.user_message,
+#             bot_response=message.bot_response,
+#             created_at=message.created_at
+#         )
+#     except Exception as e:
+#         print(f"Error occurred: {e}")
+#         raise HTTPException(status_code=500, detail="An error occurred while sending the message. Please try again later.")
 @router.post("/messages", response_model=MessageResponse)
 async def send_message(message_data: MessageCreate):
+    """Send a message and get AI response"""
     try:
-        ai_response = await generate_ai_response(message_data.user_message, message_data.chat_id, message_data.user_id)
-
+        # Generate AI response (replace with your AI service)
+        ai_response = await generate_ai_response(message_data.user_message,message_data.chat_id,message_data.user_id)
+        
+        # Save message to database
         message = await Message.create(
             user_id=message_data.user_id,
             chat_id=message_data.chat_id,
             user_message=message_data.user_message,
             bot_response=ai_response
         )
-
+        
+        # Update chat title if it's the first real message
         chat = await Chat.get(id=message_data.chat_id)
         if chat.title == "New Chat" and message_data.user_message.strip():
+            # Use first few words of the message as title
             title_words = message_data.user_message.split()[:5]
             new_title = " ".join(title_words)
             if len(new_title) > 50:
                 new_title = new_title[:47] + "..."
             chat.title = new_title
+            await chat.save()     
+        
+        # Update chat's updated_at timestamp
         chat.updated_at = datetime.now()
         await chat.save()
-
-        # 🔥 NEW: parse & execute actions
-        actions = parse_actions(message_data.user_message)
-        for a in actions:
-            if a.name == "notify":
-                await push_notification(
-                    user_id=message_data.user_id,
-                    title=a.params.get("title", "Notification"),
-                    body=a.params.get("body", ""),
-                    data={"chat_id": message_data.chat_id, "tag": a.params.get("tag", "general")}
-                )
-            elif a.name == "create_reminder":
-                await create_reminder(
-                    user_id=message_data.user_id,
-                    message=a.params.get("message", ""),
-                    due_at_utc=a.params.get("when_utc"),
-                    meta={"chat_id": message_data.chat_id}
-                )
-                # Optional immediate ack to the user (extra message):
-                # await Message.create(...)
-
+        
         return MessageResponse(
             id=message.id,
             user_id=message.user_id,
@@ -167,9 +208,16 @@ async def send_message(message_data: MessageCreate):
             bot_response=message.bot_response,
             created_at=message.created_at
         )
+    
     except Exception as e:
+        # Log the error or print the details if needed
         print(f"Error occurred: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while sending the message. Please try again later.")
+        
+        # Raise an HTTPException with an appropriate status code and error message
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while sending the message. Please try again later."
+        )
 
 @router.delete("/chats/{chat_id}")
 async def delete_chat(chat_id: int):
