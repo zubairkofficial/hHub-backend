@@ -280,7 +280,7 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
             print(f"there is reference layout type = {type(reference_layout)}")
 
         if not reference_layout:
-            raise HTTPException(status_code=404, detail="No reference layout found for the image type.")
+            raise HTTPException(status_code=404, detail="No reference layout found for the image type.Please go to brand guidelines and upload your reference images")
 
         if reference_layout.get("image_filename", ""):
             print(f"reference image name is = {reference_layout.get('image_filename', '')}")
@@ -288,7 +288,7 @@ async def generate_image_for_post(request: GenerateImageForPostRequest, image_no
         else:
             raise HTTPException(
                 status_code=404,
-                detail="No reference layout found for the image type not found image_filename.",
+                detail=f"No reference layout found for the image type not found {image_filename}.",
             )
 
         # Build the image generation prompt

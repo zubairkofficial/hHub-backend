@@ -157,7 +157,7 @@ class ImageSelectionRequest(BaseModel):
     unselected_image_ids: Optional[list] = None
 
 class GeneratePostsRequest(BaseModel):
-    user_id: str
+    user_id: int
     idea: str
     keywords: str
 
@@ -718,40 +718,62 @@ async def save_selected_image(request: ImageSelectionRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error saving selected image: {str(e)}")
 
+# --- replace your generate_posts with this version ---
 @router.post("/business-post/generate-posts")
 async def generate_posts(request: GeneratePostsRequest):
-
     try:
         helper = BusinessPostHelper()
+
+        # user_id is int now — query will match DB
         settings = await PostSettings.filter(user_id=request.user_id).first()
         if not settings:
+            # keep this a real 404
             raise HTTPException(status_code=404, detail="Post settings not found")
+
         post_bundles = []
-        for i in range(3):
+        for _ in range(3):
             bundle = await helper.generate_post_bundle(
                 business_idea=request.idea,
-                keywords=request.keywords  # Use actual keywords
+                keywords=request.keywords
             )
+            # ensure JSON-serializable
+            if hasattr(bundle, "model_dump"):
+                bundle = bundle.model_dump()
+            elif hasattr(bundle, "dict"):
+                bundle = bundle.dict()
             post_bundles.append(bundle)
-   
-        # Save post options and keywords to draft
-        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False).order_by('-updated_at').first()
+
+        # Save post options & keywords to the latest in-progress draft
+        draft = await PostDraft.filter(user_id=request.user_id, is_complete=False)\
+                               .order_by('-updated_at')\
+                               .first()
         if draft:
-            draft.post_options = post_bundles
-            # Ensure keywords is always a list for JSONField
+            draft.post_options = [
+                {
+                    "content": (b.get("content", "") if isinstance(b, dict) else str(b)),
+                    "title": (b.get("title", "") if isinstance(b, dict) else ""),
+                    "description": (b.get("description", "") if isinstance(b, dict) else ""),
+                } for b in post_bundles
+            ]
+
+            # keywords: store as list in JSONField, robust to plain string/JSON string
             import json
             try:
-                parsed_keywords = json.loads(request.keywords)
-                if not isinstance(parsed_keywords, (list, dict)):
-                    parsed_keywords = [parsed_keywords]
+                parsed = json.loads(request.keywords)
+                if not isinstance(parsed, (list, dict)):
+                    parsed = [parsed]
             except Exception:
-                parsed_keywords = [request.keywords]
-            draft.keywords = parsed_keywords
+                parsed = [request.keywords] if request.keywords else []
+            draft.keywords = parsed
             await draft.save()
-        print(f"Total Posts = {post_bundles}")
-        
+
         return {"posts": post_bundles}
+
+    except HTTPException as e:
+        # important: don't convert explicit HTTP errors to 500
+        raise e
     except Exception as e:
+        # log if you want; then keep as 500
         raise HTTPException(status_code=500, detail=f"Error generating posts: {str(e)}")
 
 @router.post("/business-post/upload-image-for-post")
@@ -778,41 +800,39 @@ async def upload_image_for_post(user_id: str = Form(...), post_index: int = Form
 @router.post("/business-post/draft/select-post")
 async def select_post(request: SelectPostRequest):
     try:
-        print(f"[select_post] Incoming request: {request}")
         draft = await PostDraft.get(id=request.draft_id)
-        print(f"[select_post] Loaded draft: {draft}")
         if not draft:
-            print("[select_post] Draft not found")
             raise HTTPException(status_code=404, detail="Draft not found")
-        # Save selected post and image
-        if draft.post_options and request.post_text in draft.post_options:
-            post_index = draft.post_options.index(request.post_data)
-        else:
-            print(f"[select_post] post_text not found in post_options. post_text: {request.post_text}, post_options: {draft.post_options}")
-            post_index = 0
+
+        # choose index by matching dict; fallback to 0
+        post_index = 0
+        if draft.post_options and request.post_data:
+            try:
+                post_index = next(
+                    i for i, opt in enumerate(draft.post_options or [])
+                    if isinstance(opt, dict) and isinstance(request.post_data, dict)
+                    and opt.get("content") == request.post_data.get("content")
+                    and opt.get("title") == request.post_data.get("title")
+                )
+            except StopIteration:
+                post_index = 0
+
         draft.selected_post_index = post_index
         draft.selected_image_id = request.image_id
         draft.current_step = 4
         await draft.save()
-        # Move selected image from temp_images to images if needed
-        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'temp_images')
-        images_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'images')
-        temp_path = os.path.join(temp_dir, request.image_id)
-        images_path = os.path.join(images_dir, request.image_id)
-        print(f"[select_post] temp_path: {temp_path}, images_path: {images_path}")
-        print(f"[select_post] temp_path exists: {os.path.exists(temp_path)}, images_path exists: {os.path.exists(images_path)}")
-        try:
-            if os.path.exists(temp_path) and not os.path.exists(images_path):
-                shutil.move(temp_path, images_path)
-                print(f"[select_post] Image moved from temp_images to images: {request.image_id}")
-            else:
-                print(f"[select_post] Image not moved. temp_path exists: {os.path.exists(temp_path)}, images_path exists: {os.path.exists(images_path)}")
-        except Exception as move_err:
-            print(f"[select_post] Error moving image: {move_err}")
-        print(f"[select_post] Selection saved: post_index={post_index}, image_id={request.image_id}, draft.selected_image_id={draft.selected_image_id}")
-        return {"message": "Selection saved"}
+
+        # move file from temp_images → images if needed
+        base = os.path.dirname(os.path.abspath(__file__))
+        temp_path = os.path.join(base, '..', 'temp_images', request.image_id)
+        images_path = os.path.join(base, '..', 'images', request.image_id)
+        if os.path.exists(temp_path) and not os.path.exists(images_path):
+            shutil.move(temp_path, images_path)
+
+        return {"message": "Selection saved", "post_index": post_index}
+    except HTTPException as e:
+        raise e
     except Exception as e:
-        print(f"[select_post] Error: {e}")
         raise HTTPException(status_code=500, detail=f"Error selecting post: {str(e)}")
 
 @router.post("/business-post/draft/edit-post")
