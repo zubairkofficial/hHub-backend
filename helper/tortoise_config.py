@@ -27,6 +27,7 @@ TORTOISE_CONFIG = {
                 'models.image_settings',
                 'models.image_generation_setting',
                 'models.post_history',
+                'models.agent_run',      
             ],
             'default_connection': 'default'
         },

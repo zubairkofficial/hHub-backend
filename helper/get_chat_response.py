@@ -3,17 +3,21 @@
 import os
 import json
 from typing import Any, Dict, List
-
+import re
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from models.message import Message
 from models.system_prompt import SystemPrompts
 from helper.get_data import get_client_data
 
-from helper.tools.lead_tools import update_lead  # tool
+# === if you still want direct tool-binding calls here, you can import tools
+# from helper.tools.lead_tools import update_lead  # not needed in this file now
+
+# use orchestrator only for lead/agenty stuff
+from agents.orchestrator import run_with_agent
 
 load_dotenv()
 
@@ -27,19 +31,27 @@ def dlog(tag: str, payload: Dict[str, Any]):
         except Exception:
             print(f"[AI-DBG] {tag} :: {payload}")
 
+# -----------------------------
+# Classic chat chain (your old)
+# -----------------------------
 prompt = ChatPromptTemplate.from_messages([
     ("system", "{systemprompt}. Use this data to answer: {data}"),
     MessagesPlaceholder("history"),
     ("user", "{prompt}")
 ])
 
-TOOL_ENABLED_MODEL_NAME = "gpt-4o-mini"
-TOOLS = [update_lead]
-tool_model = init_chat_model(TOOL_ENABLED_MODEL_NAME, model_provider="openai").bind_tools(TOOLS)
+# Keep the non-tool model for normal replies
+BASE_MODEL_NAME = "gpt-4.1"
+model = init_chat_model(BASE_MODEL_NAME, model_provider="openai")
 
+
+# -----------------------------
+# Helpers
+# -----------------------------
 async def get_chat_history(chat_id: int) -> List[Any]:
+    """Last ~10 messages as LC messages (Human/AI)."""
     try:
-        rows = await Message.filter(chat_id=chat_id).order_by('-created_at').limit(10)
+        rows = await Message.filter(chat_id=chat_id).order_by("-created_at").limit(10)
         history: List[Any] = []
         for msg in reversed(rows):
             if msg.user_message:
@@ -52,6 +64,7 @@ async def get_chat_history(chat_id: int) -> List[Any]:
         return []
 
 async def get_prompts() -> Dict[str, str]:
+    """System prompt row from DB (fallback to default)."""
     try:
         sp = await SystemPrompts.filter().first()
         if sp and sp.system_prompt:
@@ -61,165 +74,82 @@ async def get_prompts() -> Dict[str, str]:
         dlog("prompts.error", {"error": str(e)})
         return {"systemprompt": "You are an assistant of 'Houmanity' project"}
 
-# async def generate_ai_response(user_message: str, chat_id: str, user_id: str) -> str:
-#     """Main entry: build context, let the LLM reply, and execute tool calls when requested."""
-#     dlog("chat.incoming", {"user_message": user_message, "chat_id": chat_id, "user_id": user_id})
+# very light intent check to decide if we should go to agents
+_AGENT_KEYWORDS = (
+    # Lead-related
+    "lead", "leads", "update lead", "edit lead", "change lead",
+    "lead id", "lead#", "lookup lead", "find lead", "search lead",
+    "client lead", "client_leads", "crm",
+    # Clinic-related
+    "clinic", "clinics", "update clinic", "edit clinic", "change clinic",
+    "rename clinic", "set clinic name", "clinic id", "clinic#", "office", "location"
+)
 
-#     history = await get_chat_history(int(chat_id))
-#     response_data = await get_client_data(int(user_id))
-#     prompts = await get_prompts()
+_LEAD_NUM_TAIL = re.compile(r"\blead\s*(?:id|#)?\s*\d+\b", re.IGNORECASE)   # lead 16
+_LEAD_NUM_HEAD = re.compile(r"\b\d+\s*lead\b", re.IGNORECASE)               # 16 lead
 
-#     # Build chat messages
-#     msg_bundle = await prompt.ainvoke({
-#         "systemprompt": prompts["systemprompt"],
-#         "data": response_data or "none",
-#         "history": history,
-#         "prompt": user_message,
-#     })
-#     messages = msg_bundle.to_messages()
-
-#     # For visibility, show the final rendered prompt bits
-#     try:
-#         sys_msg = msg_bundle.messages[0].content if msg_bundle.messages else "(none)"
-#     except Exception:
-#         sys_msg = "(unavailable)"
-#     dlog("prompt.rendered", {"system": sys_msg, "user": user_message})
-
-#     # First pass — may include tool calls
-#     ai_msg = await tool_model.ainvoke(messages)
-
-#     dlog("ai.first", {
-#         "type": type(ai_msg).__name__,
-#         "content": getattr(ai_msg, "content", None),
-#         "tool_calls": getattr(ai_msg, "tool_calls", None)
-#     })
-
-#     # Did the model call any tools?
-#     if getattr(ai_msg, "tool_calls", None):
-#         tool_name_to_fn = {t.name: t for t in TOOLS}
-#         followups: List[Any] = [ai_msg]
-
-#         for tc in ai_msg.tool_calls:
-#             name = tc.get("name")
-#             args = tc.get("args", {})
-
-#             dlog("tool.invocation", {"tool": name, "args": args})
-#             tool_fn = tool_name_to_fn.get(name)
-
-#             if tool_fn is None:
-#                 tool_result = f"{name}:FAIL:Tool not registered"
-#                 dlog("tool.error", {"tool": name, "error": "not registered"})
-#             else:
-#                 try:
-#                     tool_result = await tool_fn.ainvoke(args)  # async tool execution
-#                 except Exception as e:
-#                     tool_result = f"{name}:FAIL:{str(e)}"
-#                     dlog("tool.exception", {"tool": name, "error": str(e)})
-
-#             dlog("tool.result", {"tool": name, "result": tool_result})
-#             followups.append(ToolMessage(content=tool_result, tool_call_id=tc["id"]))
-
-#         final = await tool_model.ainvoke(messages + followups)
-#         dlog("ai.final", {
-#             "type": type(final).__name__,
-#             "content": getattr(final, "content", None)
-#         })
-#         return final.content
-
-#     # No tool calls → plain response
-#     dlog("ai.plain", {"content": getattr(ai_msg, "content", None)})
-#     return ai_msg.content
-from langchain.chat_models import init_chat_model
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import HumanMessage, AIMessage
-from models.message import Message
-import os
-from dotenv import load_dotenv
-from controller.call_transcript_controller import headers
-from helper.get_data import get_client_data
-import json
-from models.system_prompt import SystemPrompts
-
-load_dotenv()
-
-LARAVEL_API_URL  = os.getenv("API_URL")
-
-
-prompt = ChatPromptTemplate.from_messages([
-    ('system', '{systemprompt}. Use this data to answer: {data}'),
-    MessagesPlaceholder("history"),
-    ("user", "{prompt}")
-])
-model = init_chat_model("gpt-4.1", model_provider="openai")
-output_parser = StrOutputParser()
-chain = prompt | model | output_parser
-
-async def get_chat_history(chat_id: int) -> list:
-    try:
-     
-        messages = await Message.filter(chat_id=chat_id).order_by('-created_at').limit(10)
-        
-   
-        history = []
-        for msg in reversed(messages):  
-            if msg.user_message:
-                history.append(HumanMessage(content=msg.user_message))
-            if msg.bot_response:
-                history.append(AIMessage(content=msg.bot_response))
-        
-        return history
-    except Exception as e:
-        return []
+def _looks_like_agent_task(user_msg: str) -> bool:
+    if not user_msg:
+        return False
+    m = user_msg.lower()
+    # keywords OR either numeric pattern
+    return any(k in m for k in _AGENT_KEYWORDS) or \
+           bool(_LEAD_NUM_TAIL.search(user_msg)) or \
+           bool(_LEAD_NUM_HEAD.search(user_msg))
 
 
 
-
-async def generate_ai_response(user_message: str, chat_id: str, user_id: str) -> str:
+# -------------------------------------------------------
+# Main entry used by chat_controller: generate_ai_response
+# -------------------------------------------------------
+async def generate_ai_response(user_message: str, chat_id: int, user_id: str) -> str:
+    """
+    1) If the message looks like a lead/CRM operation → route to the agent orchestrator
+       (supports fetching leads by id/email/phone and updating via tools).
+    2) Otherwise → use your classic chain with {data} injected so
+       profile/company questions like 'what's my name/company' work again.
+    """
     try:
         history = await get_chat_history(int(chat_id))
-        # print(f"history is {history}")
-        response_data = await get_client_data(int(user_id))
+        response_data = await get_client_data(int(user_id))  # this contains company/user data
         prompts = await get_prompts()
-        print(prompts['systemprompt'])
-        
-        if response_data:
-            print(f"This data sent to AI: {response_data}")
-        else:
-            print(f"No data available to send to AI. {response_data}")
-         
-        response = await chain.ainvoke({
-            "systemprompt":prompts['systemprompt'],
-            "data": response_data,
-            # "data":"none",
+
+        dlog("chat.incoming", {
+            "user_id": str(user_id),
+            "chat_id": chat_id,
+            "user_message": user_message,
+            "systemprompt_head": f" {prompts['systemprompt'][:60]}",
+            "has_data": bool(response_data),
+        })
+
+        # 1) Agent path for lead/CRM type requests
+        if _looks_like_agent_task(user_message):
+            try:
+                reply = await run_with_agent(user_message=user_message, chat_id=int(chat_id), user_id=str(user_id))
+                # Orchestrator already enforces client_id on fetches and can update leads.
+                dlog("chat.reply.agent", {"len": len(reply), "preview": reply[:140]})
+                return reply or "OK"
+            except Exception as e:
+                dlog("orchestrator.error", {"error": str(e)})
+                # If agents fail, fall back to classic chain (still respond)
+                # (continue to classic path below)
+
+        # 2) Classic path (context-injected chat): best for profile/company questions
+        #    This is exactly your old behavior.
+        data_for_model = response_data if response_data else "none"
+        rendered = await prompt.ainvoke({
+            "systemprompt": prompts["systemprompt"],
+            "data": data_for_model,
             "history": history,
             "prompt": user_message
         })
+        messages = rendered.to_messages()
+        ai_msg = await model.ainvoke(messages)
 
-        return response
+        content = getattr(ai_msg, "content", None) or str(ai_msg) or "OK"
+        dlog("chat.reply", {"len": len(content), "preview": content[:140]})
+        return content
 
     except Exception as e:
-        print(f"Error while getting AI response: {str(e)}")
+        dlog("chat.error", {"error": str(e)})
         return "Sorry, I encountered an error. Please try again."
-    
-    
-async def get_prompts():
-        try:
-            prompts = await SystemPrompts.filter().first()
-        
-            if prompts:
-                systemprompt = prompts.system_prompt if prompts.system_prompt else "You are an assistant of 'Houmanity' project" 
-                
-                return {
-                    'systemprompt': systemprompt,
-                }
-            else:
-                return {
-                    'systemprompt': "You are an assistant of 'Houmanity' project" ,
-                }
-                
-        except Exception as e:
-            print(f"Error fetching prompts from database: {e}")
-            return {
-                'systemprompt': "You are an assistant of 'Houmanity' project"
-            }
