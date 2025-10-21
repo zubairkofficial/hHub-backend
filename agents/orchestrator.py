@@ -1,3 +1,5 @@
+# agents/orchestrator.py
+
 import json
 from typing import Any, Dict, List, Optional
 
@@ -29,6 +31,11 @@ from agents.tools.http_clinics import clinic_get_http
 
 def _json(o: Any) -> str:
     return json.dumps(o, ensure_ascii=False, default=str)
+
+APP_ONLY_HINT = (
+    "I can only help with Houmanity leads/clinics. "
+    "Please include a lead id, clinic id, phone, email, or a clear update command."
+)
 
 async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
     ai_dbg("chat.incoming", {"user_id": user_id, "chat_id": chat_id, "user_message": user_message})
@@ -76,7 +83,7 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
         ai_dbg("clinic.update.return", upd[:300].replace("\n", " | "))
         return upd
 
-    # 1b) lead update fast-path (NEW)
+    # 1b) lead update fast-path
     upd_lead = await fastpath_update_lead(msg, client_id_val)
     if upd_lead is not None:
         ai_dbg("lead.update.return", upd_lead[:300].replace("\n", " | "))
@@ -118,22 +125,23 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
 
     fast = await _fastpath_fetch()
     if fast is not None:
-        return fast
-
-    if fast is not None:
         ai_dbg("fastpath.return", fast[:300].replace("\n", " | "))
         return fast
 
-    # 3) Agent path
-    force_reader = (lead_id_req is not None) or (clinic_id_req is not None) or (email_hint is not None) or (phone_hint is not None)
+    # 3) Tool-driven agent path (NO generic fallback)
+    # Decide a safe agent; never SmallTalk.
     try:
-        agent_name = "SQLReader" if force_reader else (await pick_agent(user_message))["agent"]
+        # Prefer SQLReader when we have explicit ids/hints, else use router.
+        agent_name = "SQLReader" if (lead_id_req or clinic_id_req or email_hint or phone_hint) else (await pick_agent(user_message))["agent"]
     except Exception:
-        agent_name = "SmallTalk"
+        # If router fails, still stay in-app — choose SQLReader (tooling only)
+        agent_name = "SQLReader"
 
-    spec = get_agent(agent_name) if agent_name in REGISTRY else get_agent("SmallTalk")
+    # Enforce registry fallback without SmallTalk
+    spec = get_agent(agent_name) if agent_name in REGISTRY else get_agent("SQLReader")
     ai_dbg("agent.selected", {"agent": spec.name})
 
+    # Bind only tools; we never use free-form LLM output as final content.
     model = init_chat_model("gpt-4o-mini", model_provider="openai")
     if getattr(spec, "allow_tool_calls", True) and spec.tools:
         model = model.bind_tools(spec.tools)
@@ -156,17 +164,10 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
     tool_calls = getattr(ai_msg, "tool_calls", None) or []
     ai_dbg("agent.tool_calls", {"tool_calls": tool_calls})
 
-    if not tool_calls and force_reader:
-        ai_dbg("agent.no_tools_but_hints", "re-running fast-path")
-        fast2 = await _fastpath_fetch()
-        if fast2 is not None:
-            ai_dbg("fastpath.return2", fast2[:300].replace("\n", " | "))
-            return fast2
-
+    # If no tool calls AND we had fetch intent -> give deterministic app hint, not generic text.
     if not tool_calls:
-        content = getattr(ai_msg, "content", "") or "OK"
-        ai_dbg("chat.reply.agent", {"len": len(content), "preview": content[:200]})
-        return content
+        ai_dbg("agent.no_tools", "no tool calls produced; returning app-only hint")
+        return APP_ONLY_HINT
 
     followups: List[Any] = [ai_msg]
     name_to_fn = {t.name: t for t in (spec.tools or [])}
@@ -199,7 +200,6 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
                 lead_updated_id = safe_args.get("lead_id") or lead_updated_id
                 # if API echoes updated lead, we could read ok flag directly
                 if isinstance(data, dict) and data.get("ok"):
-                    # short-circuit success
                     return f"Lead #{lead_updated_id or '—'} updated successfully."
 
             result_str = _json({"ok": True, "tool": name, "args_used": safe_args, "result": result})
@@ -208,6 +208,7 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
             result_str = _json({"ok": False, "tool": name, "error": f"{e.__class__.__name__}: {e}"})
         followups.append(ToolMessage(content=result_str, tool_call_id=tc["id"]))
 
+    # Deterministic returns only — no generic LLM prose
     if fetched_lead:
         if phone_hint and (fetched_lead.get("contact_number") or "").strip() != (phone_hint or "").strip():
             return "No access or unauthorized for this lead."
@@ -225,12 +226,9 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
         ]
         return "Matches:\n" + "\n".join(lines)
 
-    final = await model.ainvoke(messages + followups)
-    content = getattr(final, "content", "") or ""
-    ai_dbg("chat.reply.agent", {"len": len(content), "preview": content[:200]})
-
     # If tools ran but no explicit reply and we updated a lead, return a clear success
-    if not content and lead_updated_id:
+    if lead_updated_id:
         return f"Lead #{lead_updated_id} updated successfully."
 
-    return content or "OK"
+    # Final guard: keep it app-only
+    return APP_ONLY_HINT

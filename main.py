@@ -17,6 +17,7 @@ from controller.score_request_controller import router as score_router
 from controller.client_lead_message_suggest import router as lead_message
 from controller.clientleads_and_callrail_controller import router as clientlead_router
 from controller.chat_widget_controller import router as chat_widget_router
+from controller.analysis_controller import router as analysis_router
 
 
 app = FastAPI(lifespan=lifespan)
@@ -40,6 +41,7 @@ app.include_router(post_history_router, prefix="/api", tags=["post_history"])
 app.include_router(score_router, prefix="/api", tags=["score"])
 app.include_router(lead_message, prefix="/api", tags=["lead-message"])
 app.include_router(clientlead_router, prefix="/api", tags=["client-leads"])
+app.include_router(analysis_router, prefix="/api", tags=["analysis"])
 
 
 # generated images for post

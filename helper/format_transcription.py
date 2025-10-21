@@ -1,3 +1,5 @@
+# E:\Shoaib\Projects\hHub\hHub-backend\helper\format_transcription.py
+
 from __future__ import annotations
 
 import os
@@ -19,12 +21,27 @@ log = logging.getLogger(__name__)
 # Canonical roles
 ROLE_RECEPTIONIST = "Receptionist"
 ROLE_PATIENT = "Patient"
+ROLE_AI = "AI"  # Automated/IVR/system voice
 
 # Normalize lots of label variants → canonical roles
 _SPEAKER_NORMALIZE = [
     (re.compile(r"(?i)\b(front\s*desk|reception(?:ist)?|office\s*staff|agent|rep)\b"), ROLE_RECEPTIONIST),
     (re.compile(r"(?i)\b(caller|customer|client|patient)\b"), ROLE_PATIENT),
 ]
+
+# IVR / recorded message detector (stock/automated lines)
+_IVR_RX = re.compile(
+    r"(?i)\b("
+    r"this call is recorded|quality and training|"
+    r"thank you for calling|please (?:leave a message|hold)|"
+    r"(?:press|dial)\s+\d|"
+    r"we are (?:on the phone|assisting another patient)|"
+    r"your call is important|"
+    r"if this is an emergency|"
+    r"after the tone|"
+    r"office hours|business hours"
+    r")\b"
+)
 
 # Accept many line styles:
 #  - "- **Receptionist:** text"
@@ -66,8 +83,8 @@ _DATE_RX = re.compile(
 # Phones: E.164 or common US formats
 _PHONE_RX = re.compile(
     r"\b("
-    r"\+\d{10,15}"                       # +923331234567 / +14155552671
-    r"|(?:\(?\d{3}\)?[-\s.]?\d{3}[-\s.]?\d{4})"  # (415) 555-2671 / 415-555-2671
+    r"\+\d{10,15}"
+    r"|(?:\(?\d{3}\)?[-\s.]?\d{3}[-\s.]?\d{4})"
     r")\b"
 )
 
@@ -99,34 +116,39 @@ def _normalize_role(label: str) -> str:
     if m:
         name = m.group("name").strip()
         role = m.group("role").strip()
-        for rx, rep in _SPEAKER_NORMALIZE:
-            if rx.search(role):
-                role = rep
-                break
-        # If the role didn't match any synonym, try to detect
-        role_low = role.lower()
-        if "reception" in role_low or "front" in role_low or "desk" in role_low:
-            role = ROLE_RECEPTIONIST
-        elif "patient" in role_low or "caller" in role_low or "customer" in role_low or "client" in role_low:
-            role = ROLE_PATIENT
+
+        # Detect AI-ish roles inside parentheses
+        if re.search(r"(?i)\b(ivr|bot|automated|auto(?:mated)?\s*system|system|ai|voice\s*menu)\b", role):
+            role = ROLE_AI
+        else:
+            for rx, rep in _SPEAKER_NORMALIZE:
+                if rx.search(role):
+                    role = rep
+                    break
+            rl = role.lower()
+            if "reception" in rl or "front" in rl or "desk" in rl:
+                role = ROLE_RECEPTIONIST
+            elif any(w in rl for w in ("patient", "caller", "customer", "client")):
+                role = ROLE_PATIENT
         return f"{name} ({role})"
 
-    # No parentheses, normalize label word directly
+    # No parentheses, normalize straight labels
+    if re.search(r"(?i)\b(ivr|bot|automated|auto(?:mated)?\s*system|system|ai|voice\s*menu)\b", label):
+        return ROLE_AI
+
     norm = label
     for rx, rep in _SPEAKER_NORMALIZE:
         if rx.search(label):
             norm = rep
             break
 
-    # Heuristics if still raw
     l = norm.lower()
-    if "reception" in l or "front" in l or "desk" in l or "office" in l or "agent" in l or "rep" in l:
+    if any(w in l for w in ("reception", "front", "desk", "office", "agent", "rep")):
         return ROLE_RECEPTIONIST
-    if "caller" in l or "customer" in l or "client" in l or "patient" in l:
+    if any(w in l for w in ("caller", "customer", "client", "patient")):
         return ROLE_PATIENT
 
     # If looks like a personal name and no role word, keep as-is
-    # (Model might have already produced "Tatiana (Patient)"—we handle above.)
     return norm
 
 def _mk_bullet(role_display: str, body: str, *, output: str) -> str:
@@ -164,8 +186,8 @@ def _collapse_fillers(lines: List[str]) -> List[str]:
 # ===============================================================
 def format_transcription(raw_text: str, output: str = "markdown") -> str:
     """
-    Heuristic formatter (fallback). Separates Receptionist vs Patient, highlights
-    phones/dates/times, and produces bullets. Prefer `format_transcription_ai`.
+    Heuristic formatter (fallback). Separates AI (IVR) vs Receptionist vs Patient,
+    highlights phones/dates/times, and produces bullets. Prefer `format_transcription_ai`.
     """
     def bold(s: str) -> str:
         return _B(s, output)
@@ -213,13 +235,18 @@ def format_transcription(raw_text: str, output: str = "markdown") -> str:
     for c in chunks:
         s = c.strip()
 
-        if receptionist_cues.search(s):
+        # IVR → AI has highest priority
+        if _IVR_RX.search(s):
+            current_role = ROLE_AI
+        elif receptionist_cues.search(s):
             current_role = ROLE_RECEPTIONIST
         elif patient_cues.search(s):
             current_role = ROLE_PATIENT
         elif current_role is None:
-            current_role = ROLE_RECEPTIONIST
+            # default first block to AI if it looks like IVR; else receptionist
+            current_role = ROLE_AI if _IVR_RX.search(s) else ROLE_RECEPTIONIST
         else:
+            # alternate if ambiguous
             current_role = ROLE_PATIENT if current_role == ROLE_RECEPTIONIST else ROLE_RECEPTIONIST
 
         s = _bold_tokens(s, output=output)
@@ -246,6 +273,9 @@ def _normalize_md_lines(md: str) -> str:
             continue
         label, rest = m.group(1), m.group(2)
         norm = _normalize_role(label)
+        # Force AI if body clearly IVR
+        if _IVR_RX.search(rest):
+            norm = ROLE_AI
         out.append(f"- **{norm}:** {rest}")
     return "\n".join(out)
 
@@ -256,6 +286,7 @@ def _postprocess_any(content: str, *, output: str) -> str:
       • canonical/kept label with **bold** (or <strong>)
       • bold tokens (times, dates, phones, key terms)
       • HTML/Markdown wrapping
+      • AI override for IVR-looking bodies
     """
     is_html = output == "html"
 
@@ -272,24 +303,39 @@ def _postprocess_any(content: str, *, output: str) -> str:
             # Normalize label (and any '(role)' suffix)
             label_norm = _normalize_role(label_raw)
 
-            # If label is a bare role word, keep it; if it's "Name (Role)" keep the whole
-            # Example: "Tatiana (Patient)"
-            # Also ensure final role words are exactly Receptionist/Patient where applicable.
+            # Bold tokens inside body
             body = _bold_tokens(body, output=output)
+
+            # If the content looks like IVR stock text, force label to AI
+            if _IVR_RX.search(body):
+                label_norm = ROLE_AI
 
             normalized_items.append(_mk_bullet(label_norm, body, output=output))
             continue
 
         # If the line has no explicit "label:", try to detect leading label word at start
-        m2 = re.match(r"^\s*(Receptionist|Patient)\b[:\-\u2014]?\s*(.*)$", ln, flags=re.I)
+        m2 = re.match(r"^\s*(Receptionist|Patient|AI)\b[:\-\u2014]?\s*(.*)$", ln, flags=re.I)
         if m2:
-            role = ROLE_RECEPTIONIST if m2.group(1).lower().startswith("reception") else ROLE_PATIENT
+            role_word = m2.group(1).lower()
+            if role_word.startswith("reception"):
+                role = ROLE_RECEPTIONIST
+            elif role_word == "ai":
+                role = ROLE_AI
+            else:
+                role = ROLE_PATIENT
             body = _bold_tokens(m2.group(2).strip(), output=output)
+
+            # IVR override
+            if _IVR_RX.search(body):
+                role = ROLE_AI
+
             normalized_items.append(_mk_bullet(role, body, output=output))
             continue
 
-        # Fallback: treat as unlabeled utterance, just bold tokens
-        normalized_items.append(_mk_bullet(ROLE_RECEPTIONIST, _bold_tokens(ln, output=output), output=output))
+        # Fallback: unlabeled → detect IVR
+        body = _bold_tokens(ln, output=output)
+        role = ROLE_AI if _IVR_RX.search(ln) else ROLE_RECEPTIONIST
+        normalized_items.append(_mk_bullet(role, body, output=output))
 
     # Collapse repeated filler-y lines
     normalized_items = _collapse_fillers(normalized_items)
@@ -304,7 +350,7 @@ async def format_transcription_ai(
     timeout: int = 25,
 ) -> str:
     """
-    Use GPT to format as bullets with strict 'Receptionist' / 'Patient' roles.
+    Use GPT to format as bullets with strict 'AI' (IVR) / 'Receptionist' / 'Patient' roles.
     Robust post-processing guarantees bolding & structure even if the model slips.
     Falls back to heuristic if anything fails or no API key is present.
     """
@@ -314,7 +360,8 @@ async def format_transcription_ai(
     system_msg = (
         "You format medical/dental clinic phone transcripts. "
         "Return bullet points per utterance. "
-        "Label speakers as either 'Receptionist' or 'Patient'. "
+        "Label speakers as 'AI' for automated/recorded system messages (IVR, hold prompts, disclaimers), "
+        "otherwise 'Receptionist' or 'Patient'. "
         "If a proper name is evident, include it like 'Helena (Receptionist)' or 'Tatiana (Patient)'. "
         "Bold timestamps (e.g., 0:23), dates, phone numbers, and key terms such as appointment, estimate, patient, follow-up. "
         "Never invent details or names. "
@@ -326,7 +373,7 @@ async def format_transcription_ai(
 
 Format rules:
 - One bullet per utterance.
-- Start each line with Speaker label (Receptionist/Patient). If a name is present, use "Name (Receptionist/Patient)".
+- Start each line with Speaker label: AI (for automated/IVR/stock system audio), Receptionist, or Patient. If a name is present, use "Name (Receptionist/Patient)".
 - Use {'**bold**' if output=='markdown' else '<strong>bold</strong>'} for timestamps, dates, phone numbers, and key terms (appointment, estimate, patient, follow-up, insurance, copay, today/tomorrow).
 - Output only {output.upper()} content (no code fences).
 """
@@ -356,11 +403,11 @@ Format rules:
                 if not content:
                     return format_transcription(raw_text, output=output)
 
-                # If Markdown: normalize any stray labels like Caller/Client → Patient, etc.
+                # If Markdown: normalize any stray labels like Caller/Client → Patient, also AI override for IVR
                 if output == "markdown":
                     content = _normalize_md_lines(content)
 
-                # Strong post-processing for BOTH markdown and html
+                # Strong post-processing for BOTH markdown and html (adds AI override for IVR too)
                 return _postprocess_any(content, output=output)
 
     except Exception as e:
