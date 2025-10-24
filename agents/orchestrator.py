@@ -726,9 +726,9 @@ async def run_with_agent(user_message: str, chat_id: int, user_id: str) -> str:
                 formatted_date = date_str
 
             # Get clinic name if possible (optional: fetch via clinic_get_http if needed)
-            clinic_name = "Happy Teeth Clinic"  # Hardcode or fetch dynamically
 
-            response = f"""✅ Appointment booked successfully at {clinic_name}!
+
+            response = f"""✅ Appointment booked successfully!
 
 **Details:**
 - **Date:** {formatted_date}
