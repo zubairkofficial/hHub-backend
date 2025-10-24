@@ -9,7 +9,7 @@ CLINIC_ID_TAIL = re.compile(r"\b(?:clinic)\s*(?:id|#)?\s*(\d{1,10})\b", re.IGNOR
 CLINIC_ID_HEAD = re.compile(r"\b(\d{1,10})\s*(?:clinic)\b", re.IGNORECASE)
 
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
-PHONE_RE = re.compile(r"\+?\d[\d\-\s().]{6,}\d")
+PHONE_RE = re.compile(r'\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b')
 
 # ---------- Clinic update command patterns ----------
 # e.g. "update my clinic name Badshah"

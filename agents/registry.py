@@ -9,7 +9,9 @@ AgentName = Literal[
     "SQLWriter",
     "Knowledge",
     "SmallTalk",
-    "ClinicAgent"
+    "ClinicAgent",
+    "ServiceAgent",  # ✅ add this line
+    "AppointmentAgent",  # ✅ add this line
 ]
 
 class AgentSpec(BaseModel):
@@ -19,6 +21,7 @@ class AgentSpec(BaseModel):
     allow_tool_calls: bool = True
 
 REGISTRY: Dict[AgentName, AgentSpec] = {}
+
 def register(spec: AgentSpec):
     REGISTRY[spec.name] = spec
 
