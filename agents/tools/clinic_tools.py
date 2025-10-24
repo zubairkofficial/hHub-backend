@@ -3,8 +3,8 @@ import json
 from pydantic import BaseModel
 from langchain_core.tools import tool
 import httpx
-
-API_URL = "http://127.0.0.1:8080"  # Your Laravel API endpoint
+import os
+API_URL = os.getenv("API_URL", "http://127.0.0.1:8080")
 
 class ClinicGetArgs(BaseModel):
     client_id: int
@@ -26,3 +26,4 @@ async def clinic_get(client_id: int, clinic_id: int) -> str:
                 return json.dumps({"ok": False, "error": f"Failed to fetch clinic: {response.status_code}"}, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"ok": False, "error": f"Error fetching clinic data: {str(e)}"}, ensure_ascii=False)
+

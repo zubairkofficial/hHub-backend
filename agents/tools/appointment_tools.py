@@ -1,4 +1,4 @@
-# agents/tools/appointment_tools.py - FIXED VERSION
+# agents/tools/appointment_tools.py - MODIFIED VERSION
 
 import os
 import json
@@ -6,10 +6,11 @@ import httpx
 from typing import Optional
 from langchain_core.tools import tool
 
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8080")
+API_URL = os.getenv("API_URL")
 API_TOKEN = os.getenv("API_TOKEN", "")  # Add this to your .env file
 
 def _dump(o):
+    """Return JSON string with proper encoding."""
     return json.dumps(o, ensure_ascii=False, default=str)
 
 def _get_headers():
@@ -25,7 +26,7 @@ def _get_headers():
 async def _http_request(method: str, url: str, params=None, json_data=None):
     """
     Generic HTTP request handler with proper error handling.
-    Follows redirects and handles authentication.
+    Supports GET, POST, PATCH, DELETE. Follows redirects and handles auth.
     """
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         try:
@@ -40,19 +41,16 @@ async def _http_request(method: str, url: str, params=None, json_data=None):
             else:
                 return {"ok": False, "error": f"Unsupported method: {method}"}
 
-            # Check for successful response
             if 200 <= response.status_code < 300:
                 try:
                     return response.json()
                 except Exception:
                     return {"ok": True, "data": response.text}
             else:
-                # Return error with status code
                 try:
                     error_data = response.json()
                 except Exception:
                     error_data = response.text[:1000]
-                
                 return {
                     "ok": False,
                     "status_code": response.status_code,
@@ -69,13 +67,17 @@ async def _http_request(method: str, url: str, params=None, json_data=None):
 @tool("appointment_slots")
 async def appointment_slots(client_id: int, clinic_id: int, date: str = None) -> str:
     """
-    Get available slots for a clinic on a date.
-    Args: client_id (int), clinic_id (int), date (YYYY-MM-DD optional)
+    Retrieve available appointment slots for a clinic on a given date.
+
+    Args:
+        client_id (int): ID of the client.
+        clinic_id (int): ID of the clinic.
+        date (str, optional): Date in YYYY-MM-DD format. Defaults to None.
+
+    Returns:
+        str: JSON string of available slots.
     """
-    params = {
-        "client_id": client_id,
-        "clinic_id": clinic_id,
-    }
+    params = {"client_id": client_id, "clinic_id": clinic_id}
     if date:
         params["date"] = date
     
@@ -98,11 +100,27 @@ async def appointment_create(
     booking_for: str = None,
     dob: str = None,
     description: str = None,
-    human_readable: bool = True,  # ✅ New flag
 ) -> str:
     """
-    Create a new appointment.
-    If human_readable=True, returns a nicely formatted text instead of raw JSON.
+    Create a new appointment for a patient in a clinic.
+
+    Args:
+        client_id (int): Client ID.
+        clinic_id (int): Clinic ID.
+        date (str): Appointment date YYYY-MM-DD.
+        from_time (str): Start time HH:MM.
+        to_time (str): End time HH:MM.
+        first_name (str): Patient's first name.
+        last_name (str, optional): Patient's last name.
+        email (str): Patient email.
+        contact_number (str): Patient phone number.
+        gender (str): Patient gender.
+        booking_for (str, optional): Booking for someone else.
+        dob (str, optional): Date of birth.
+        description (str, optional): Additional notes.
+
+    Returns:
+        str: JSON string of created appointment details.
     """
     payload = {
         "client_id": client_id,
@@ -119,45 +137,24 @@ async def appointment_create(
         "gender": gender,
         "description": description,
     }
-
-    # Remove empty/None
     payload = {k: v for k, v in payload.items() if v not in (None, "")}
-
     data = await _http_request("POST", f"{API_URL}/api/appointments", json_data=payload)
-
-    if not human_readable or not data.get("ok"):
-        return _dump(data)  # fallback: raw JSON
-
-    # ✅ Build human-readable response
-    lead = data.get("lead", {})
-    clinic_name = "Happy Teeth Clinic"  # or fetch dynamically if API returns
-    response_text = f"""
-✅ Appointment Booked Successfully!
-
-📍 Clinic: {clinic_name}
-🗓 Date: {lead.get('date', date)}
-⏰ Time: {lead.get('from_time', from_time)[:5]} – {lead.get('to_time', to_time)[:5]}
-
-👤 Patient Details:
-   Name: {lead.get('first_name', first_name)} {lead.get('last_name', last_name)}
-   Email: {lead.get('email', email)}
-   Phone: {lead.get('contact_number', contact_number)}
-   DOB: {lead.get('dob', dob)}
-   Gender: {lead.get('gender', gender)}
-
-Status: {lead.get('status', 'new').capitalize()}
-"""
-    return response_text.strip()
+    return _dump(data)
 
 
 @tool("appointment_update")
 async def appointment_update(lead_id: int, **fields) -> str:
     """
-    Update an appointment (lead) by id. Fields may include clinic_id, date, from_time, to_time, etc.
+    Update an existing appointment by lead_id.
+
+    Args:
+        lead_id (int): Appointment ID.
+        **fields: Any fields to update (clinic_id, date, times, email, etc.).
+
+    Returns:
+        str: JSON string of updated appointment details.
     """
-    # Remove None values
     payload = {k: v for k, v in fields.items() if v is not None}
-    
     data = await _http_request("PATCH", f"{API_URL}/api/appointments/{lead_id}", json_data=payload)
     return _dump(data)
 
@@ -165,7 +162,13 @@ async def appointment_update(lead_id: int, **fields) -> str:
 @tool("appointment_cancel")
 async def appointment_cancel(lead_id: int) -> str:
     """
-    Cancel an appointment (sets status=cancel).
+    Cancel an appointment (status will be set to 'cancel').
+
+    Args:
+        lead_id (int): Appointment ID to cancel.
+
+    Returns:
+        str: JSON string of cancellation result.
     """
     data = await _http_request("DELETE", f"{API_URL}/api/appointments/{lead_id}")
     return _dump(data)
@@ -174,11 +177,17 @@ async def appointment_cancel(lead_id: int) -> str:
 @tool("appointment_get")
 async def appointment_get(lead_id: int, client_id: int = None) -> str:
     """
-    Get appointment details by lead_id.
+    Retrieve appointment details by lead ID.
+
+    Args:
+        lead_id (int): Appointment ID.
+        client_id (int, optional): Client ID for verification.
+
+    Returns:
+        str: JSON string of appointment details.
     """
     params = {}
     if client_id:
         params["client_id"] = client_id
-    
     data = await _http_request("GET", f"{API_URL}/api/appointments/{lead_id}", params=params)
     return _dump(data)
